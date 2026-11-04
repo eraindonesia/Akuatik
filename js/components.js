@@ -31,6 +31,10 @@ function pager(total, page, size) {
     '<button data-p="' + (page + 1) + '" ' + (page >= n ? 'disabled' : '') + ' aria-label="Berikutnya">' + icon('chevR', 's16') + '</button></nav>';
 }
 function waveSvg(cls) { return '<svg class="wave ' + (cls || '') + '" viewBox="0 0 1440 48" preserveAspectRatio="none" aria-hidden="true"><path d="M0 24C120 4 240 4 360 20s240 24 360 8 240-26 360-12 240 22 360 6V48H0z"/></svg>'; }
+const DEFAULT_LOGO = 'https://res.cloudinary.com/qzxx5soz/image/upload/f_auto,q_auto/Logo_ERA_crop';
+function logoUrl() { const u = (ERA.S.boot && ERA.S.boot.settings && ERA.S.boot.settings.LOGO_URL) || ''; return validUrl(u) ? u : DEFAULT_LOGO; }
+ERA.logoErr = function (el) { const p = el.parentNode; if (p) p.classList.remove('logo'); el.outerHTML = icon('wave', 's24'); };
+function logoMark() { return '<img class="logo-img" src="' + esc(logoUrl()) + '" alt="Logo ERA" decoding="async" onerror="ERA.logoErr(this)">'; }
 function setting(k, d) { const s = ERA.S.boot && ERA.S.boot.settings; return (s && s[k]) || d || ''; }
 
 /* ---------- menu publik ---------- */
@@ -65,8 +69,16 @@ const Shell = {
   type: '', menu: null,
   main() { return $('#main') || $('#cmain'); },
   fresh(id) { const o = $('#' + id); if (!o) return null; const n = o.cloneNode(false); o.replaceWith(n); return n; },   // buang listener rute sebelumnya
+  fitNav() {   // menu otomatis menjadi tombol ☰ bila tidak muat (berlaku di zoom / lebar layar berapa pun)
+    const nav = $('.nav'), ul = nav && $('.menu', nav); if (!ul) return;
+    nav.classList.remove('compact');
+    const need = Array.from(ul.children).reduce((a, li) => a + li.getBoundingClientRect().width, 0);
+    if (need > ul.clientWidth - 6) nav.classList.add('compact');
+  },
   bindOnce() {
     if (this._g) return; this._g = 1;
+    window.addEventListener('resize', debounce(() => Shell.fitNav(), 120));
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => Shell.fitNav());
     $('#app').addEventListener('click', async e => {
       const b = e.target.closest('[data-act]'); if (!b) return;
       if (b.dataset.act === 'theme') Theme.toggle();
@@ -78,19 +90,18 @@ const Shell = {
   public(active) {
     if (this.type !== 'public') {
       this.menu = buildMenu(); this.type = 'public';
-      const m = this.menu, logo = setting('LOGO_URL');
-      const mark = logo ? '<img src="' + esc(logo) + '" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:12px">' : icon('wave', 's24');
+      const m = this.menu, mark = logoMark();
       $('#app').innerHTML =
         (ERA.S.boot.demo ? '<div class="demo-bar">Mode <b>data contoh</b> aktif — ganti dengan data asli atau jalankan <code>hapusDataContoh()</code> di Apps Script.</div>' : '') +
         '<div class="topbar"><div class="wrap"><span class="live">PORTAL RISET LIMNOLOGI TERBUKA</span><span>WGS84 · OPEN ACCESS CC-BY-NC 4.0</span></div></div>' +
-        '<header class="nav"><div class="wrap"><a class="brand" href="#/" aria-label="Beranda ERA"><span class="mk">' + mark + '</span><span><b>' + esc(setting('SITE_NAME', 'Ekspedisi Riset Akuatik')) + '</b><small>' + esc(setting('SITE_TAGLINE', 'ERA LIMNOLOGY & MARINE PORTAL')) + '</small></span></a>' +
+        '<header class="nav"><div class="wrap"><a class="brand" href="#/" aria-label="Beranda ERA"><span class="mk logo">' + mark + '</span><span><b>' + esc(setting('SITE_NAME', 'Ekspedisi Riset Akuatik')) + '</b><small>' + esc(setting('SITE_TAGLINE', 'ERA LIMNOLOGY & MARINE PORTAL')) + '</small></span></a>' +
         '<ul class="menu" role="menubar">' + m.map(i => '<li data-k="' + i.k + '"><a href="#' + i.path + '/' + (i.subs[0][0]) + '" role="menuitem">' + esc(i.label) + (i.subs.length > 1 ? icon('chevD', 's16') : '') + '</a><div class="mega" role="menu">' + i.subs.map(s => '<a href="#' + i.path + '/' + s[0] + '" role="menuitem">' + icon('chevR', 's16') + esc(s[1]) + '</a>').join('') + '</div></li>').join('') + '</ul>' +
-        '<div class="nav-r"><button class="btn btn-o btn-ic" data-act="search" aria-label="Cari">' + icon('search') + '</button><button class="btn btn-o btn-ic" data-theme-ic data-act="theme" aria-label="Ganti tema">' + icon(Theme.get() === 'dark' ? 'sun' : 'moon') + '</button><a class="btn btn-o" id="nav-login" href="#/login">' + icon('user', 's16') + '<span>Member Login</span></a><button class="btn btn-o btn-ic burger" data-act="burger" aria-label="Menu">' + icon('menu') + '</button></div></div></header>' +
+        '<div class="nav-r"><button class="btn btn-o btn-ic" data-act="search" aria-label="Cari">' + icon('search') + '</button><button class="btn btn-o btn-ic" data-theme-ic data-act="theme" aria-label="Ganti tema">' + icon(Theme.get() === 'dark' ? 'sun' : 'moon') + '</button><a class="btn btn-o btn-sm" id="nav-login" href="#/login">' + icon('user', 's16') + '<span>Member Login</span></a><button class="btn btn-o btn-ic burger" data-act="burger" aria-label="Menu">' + icon('menu') + '</button></div></div></header>' +
         '<main id="main" tabindex="-1"></main>' + this.footer() +
         '<div class="drawer-m" id="dm"><nav aria-label="Menu utama"><div class="row sp" style="margin-bottom:8px"><b>Menu</b><button class="btn btn-o btn-ic" data-act="burger" aria-label="Tutup">' + icon('x') + '</button></div><a class="btn btn-o btn-block" href="#/" style="margin-bottom:8px">Beranda</a>' + m.map(i => '<details><summary>' + esc(i.label) + icon('chevD', 's16') + '</summary>' + i.subs.map(s => '<a href="#' + i.path + '/' + s[0] + '">' + esc(s[1]) + '</a>').join('') + '</details>').join('') + '</nav></div>';
       this.bindPublic();
     }
-    this.bindOnce();
+    this.bindOnce(); this.fitNav(); requestAnimationFrame(() => Shell.fitNav());
     $$('.menu>li').forEach(li => li.classList.toggle('act', li.dataset.k === active));
     const nl = $('#nav-login'); if (nl) { nl.href = Auth.on ? '#/app' : '#/login'; nl.querySelector('span').textContent = Auth.on ? 'Dashboard' : 'Member Login'; }
     $('#dm') && $('#dm').classList.remove('open');
@@ -106,7 +117,7 @@ const Shell = {
   },
   footer() {
     const soc = [['SOCIAL_INSTAGRAM', 'IG', 'Instagram'], ['SOCIAL_YOUTUBE', 'YT', 'YouTube'], ['SOCIAL_LINKEDIN', 'in', 'LinkedIn'], ['SOCIAL_GITHUB', 'GH', 'GitHub'], ['SOCIAL_ZENODO', 'Zn', 'Zenodo'], ['SOCIAL_X', 'X', 'X']].filter(s => validUrl(setting(s[0])));
-    return '<footer class="foot"><div class="wrap"><div class="grid"><div><div class="brand" style="color:#fff!important;margin-bottom:12px"><span class="mk" style="background:rgba(255,255,255,.08)">' + icon('wave', 's24') + '</span><b style="font-size:16px">' + esc(setting('SITE_NAME', 'ERA Portal')) + '</b></div><p style="font-size:14px">Pusat pengkajian dan observasi ekosistem perairan darat. Mengembangkan sains konservasi berbasis data terintegrasi.</p></div>' +
+    return '<footer class="foot"><div class="wrap"><div class="grid"><div><div class="brand" style="color:#fff!important;margin-bottom:12px"><span class="mk logo">' + logoMark() + '</span><b style="font-size:16px">' + esc(setting('SITE_NAME', 'ERA Portal')) + '</b></div><p style="font-size:14px">Pusat pengkajian dan observasi ekosistem perairan darat. Mengembangkan sains konservasi berbasis data terintegrasi.</p></div>' +
       '<div><h4>Research Stations</h4><a href="#/contact/info">' + esc(setting('ADDRESS')) + '</a><a href="#/expeditions/locations">Lihat semua lokasi riset →</a></div>' +
       '<div><h4>Portal Directory</h4>' + [['/about/who', 'About'], ['/research/all', 'Research'], ['/expeditions/overview', 'Expeditions'], ['/database/fish', 'Database'], ['/publications/all', 'Publications'], ['/news/all', 'News'], ['/collaboration/overview', 'Collaboration'], ['/knowledge/all', 'Knowledge']].map(x => '<a href="#' + x[0] + '">' + x[1] + '</a>').join('') + '</div>' +
       '<div><h4>Hubungi Kami</h4><a href="mailto:' + esc(setting('EMAIL')) + '">' + esc(setting('EMAIL')) + '</a><a href="tel:' + esc(String(setting('PHONE')).replace(/\s/g, '')) + '">' + esc(setting('PHONE')) + '</a><span style="font-size:13px;color:#8FAAC4">' + esc(setting('OFFICE_HOURS')) + '</span>' + (soc.length ? '<div class="soc" style="margin-top:14px">' + soc.map(s => '<a href="' + esc(s[0] && setting(s[0])) + '" target="_blank" rel="noopener noreferrer" aria-label="' + s[2] + '" class="mono xs">' + s[1] + '</a>').join('') + '</div>' : '') + '</div></div>' +
@@ -121,7 +132,7 @@ const Shell = {
       const sch = ERA.S.boot.schema.entities, can = k => Auth.can(sch[k].perm);
       const ent = Object.keys(sch).filter(k => can(k) && !['team', 'partners'].includes(k)).map(k => '<a class="it" href="#/app/content/' + k + '" data-k="c-' + k + '">' + icon({ research: 'flask', expeditions: 'compass', locations: 'pin', species: 'fish', distribution: 'globe', specimens: 'layers', conservation: 'leaf', publications: 'book', news: 'file', gallery: 'image', events: 'cal', knowledge: 'db' }[k] || 'file') + sch[k].label + '</a>').join('');
       const admOnly = adm ? '<a class="it" href="#/app/content/team" data-k="c-team">' + icon('users') + 'Team</a><a class="it" href="#/app/content/partners" data-k="c-partners">' + icon('handshake') + 'Partners</a>' : '';
-      $('#app').innerHTML = '<div class="cms"><aside class="side" id="side" aria-label="Navigasi CMS"><div class="lg"><span class="on">● ONLINE</span><b>ERA CMS</b><small>EKSPEDISI RISET AKUATIK</small></div>' +
+      $('#app').innerHTML = '<div class="cms"><aside class="side" id="side" aria-label="Navigasi CMS"><div class="lg"><span class="on">● ONLINE</span><span class="mk logo" style="display:inline-flex;margin-bottom:10px">' + logoMark() + '</span><br><b>ERA CMS</b><small>EKSPEDISI RISET AKUATIK</small></div>' +
         '<div class="rolesw" aria-label="Peran"><span class="' + (adm ? 'on' : '') + '">Admin</span><span class="' + (!adm ? 'on' : '') + '">Member</span></div>' +
         '<h5>Core Workspace</h5><a class="it" href="#/app" data-k="dash">' + icon('grid') + (adm ? 'Console Desk' : 'My Workspace') + '</a>' +
         (adm ? '<a class="it" href="#/app/queue" data-k="queue">' + icon('clip') + 'Approvals<span class="n" id="bq" hidden></span></a>' : '<a class="it" href="#/app/revisions" data-k="rev">' + icon('hist') + 'Revisions<span class="n o" id="br" hidden></span></a>') +

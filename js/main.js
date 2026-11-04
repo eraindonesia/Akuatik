@@ -46,7 +46,7 @@
 
   // ---- boot ----
   let started = false;
-  function splash(msg) { $('#app').innerHTML = '<div style="min-height:100vh;display:grid;place-items:center;text-align:center;padding:24px"><div><div class="brand" style="justify-content:center;margin-bottom:18px"><span class="mk" style="color:#53dad1">' + icon('wave', 's24') + '</span></div>' + (msg || '<div class="sk" style="width:220px;height:12px;margin:auto"></div><p class="muted sm" style="margin-top:14px">Memuat portal…</p>') + '</div></div>'; }
+  function splash(msg) { $('#app').innerHTML = '<div style="min-height:100vh;display:grid;place-items:center;text-align:center;padding:24px"><div><div class="brand" style="justify-content:center;margin-bottom:18px"><span class="mk logo">' + logoMark() + '</span></div>' + (msg || '<div class="sk" style="width:220px;height:12px;margin:auto"></div><p class="muted sm" style="margin-top:14px">Memuat portal…</p>') + '</div></div>'; }
   async function boot() {
     Auth.load();
     splash();
@@ -54,6 +54,7 @@
     try {
       await API.swr('pub.boot', {}, (d, cached) => {
         ERA.S.boot = d;
+        const fav = document.querySelector('link[rel=icon]'); if (fav) fav.href = logoUrl();
         if (!started) { started = true; Router.run(); }
         else if (!cached && Shell.type === 'public' && Router.cur.path === '/') { Shell.type = ''; Router.run(); }
       }, 120);

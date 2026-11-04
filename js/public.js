@@ -82,7 +82,7 @@ function Listing(host, o) {
 Pages.home = function () {
   const B = ERA.S.boot, H = B.home, st = B.stats, org = B.org || {};
   const main = Shell.public('home');
-  const heroImg = validUrl(setting('HERO_IMAGE')) ? setting('HERO_IMAGE') : '';
+  const heroImg = validUrl(setting('HERO_IMAGE')) && setting('HERO_IMAGE') !== logoUrl() ? setting('HERO_IMAGE') : '';   // logo bukan foto hero
   const intro = String(org.who || '').split(/\n\s*\n/)[0];
   const locs = H.locations || [];
   main.innerHTML = `
