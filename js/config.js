@@ -4,6 +4,6 @@
    URL ini AMAN dipublikasikan; semua rahasia berada di Script Properties backend.
    ============================================================ */
 window.ERA_CONFIG = {
-  GAS_URL: 'PASTE_URL_WEB_APP_ANDA_DI_SINI',   // contoh: https://script.google.com/macros/s/AKfycb.../exec
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbxda8ntMf-jgk_VRRGIEw6NvfJIuS5X08aY30V6e7fQO8NkDCCCDw1VEk2QN60LtWetNQ/exec',   // contoh: https://script.google.com/macros/s/AKfycb.../exec
   CACHE_TTL_SEC: 300                            // masa segar cache lokal (detik)
 };
