@@ -1,5 +1,5 @@
 'use strict';
-/* ERA Portal — main.js : boot • daftar rute • penanganan galat global */
+/* ERA Portal — main.js : boot instan • daftar rute • prefetch • penanganan galat global */
 (function () {
   const R = (p, h, o) => Router.on(p, h, o);
   const redirect = to => () => Router.go(to, true);
@@ -32,9 +32,8 @@
   R('/app/settings', (p, q, T) => Pages.settings(p, q, T), AD);
   Router.notFound = {
     opt: {}, handler: async () => {
-      if (!ERA.S.boot) return;
-      const main = Auth.on && /^\/app/.test(Router.cur.path) ? Shell.admin('', 'Tidak ditemukan') : Shell.public('');
-      main.innerHTML = '<section class="sec"><div class="wrap">' + Views.empty('Halaman tidak ditemukan', 'Alamat yang Anda tuju tidak tersedia.', '<a class="btn btn-p" href="' + (Auth.on && /^\/app/.test(Router.cur.path) ? '#/app' : '#/') + '">Kembali</a>', 'compass') + '</div></section>';
+      const adm = Auth.on && /^\/app/.test(Router.cur.path), main = adm ? Shell.admin('', 'Tidak ditemukan') : Shell.public('');
+      main.innerHTML = '<section class="sec"><div class="wrap">' + Views.empty('Halaman tidak ditemukan', 'Alamat yang Anda tuju tidak tersedia.', '<a class="btn btn-p" href="' + (adm ? '#/app' : '#/') + '">Kembali</a>', 'compass') + '</div></section>';
     }
   };
 
@@ -44,24 +43,68 @@
   window.addEventListener('error', e => report(e.message));
   window.addEventListener('unhandledrejection', e => report(e.reason && e.reason.message));
 
-  // ---- boot ----
-  let started = false;
-  function splash(msg) { $('#app').innerHTML = '<div style="min-height:100vh;display:grid;place-items:center;text-align:center;padding:24px"><div><div class="brand" style="justify-content:center;margin-bottom:18px"><span class="mk logo">' + logoMark() + '</span></div>' + (msg || '<div class="sk" style="width:220px;height:12px;margin:auto"></div><p class="muted sm" style="margin-top:14px">Memuat portal…</p>') + '</div></div>'; }
+  // ---- boot instan: aplikasi TIDAK menunggu server untuk tampil ----
+  const verCmp = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true });
+  function currentSchema() {
+    const emb = window.ERA_SCHEMA; let st = null;
+    try { st = JSON.parse(localStorage.getItem('era.schema') || 'null'); } catch (e) { }
+    return st && st.entities && verCmp(st.ver, emb.ver) > 0 ? st : emb;
+  }
+  const placeholder = schema => ({ loading: true, app: {}, schema: schema, settings: {}, org: {}, demo: false, schemaVer: schema.ver, stats: { research: 0, expeditions: 0, publications: 0, species: 0, specimens: 0, locations: 0, conservation: 0, news: 0, endemic: 0 }, home: { research: [], expeditions: [], species: [], locations: [], news: [], publications: [], events: [] } });
+  const needsBoot = p => p === '/' || /^\/(about|contact)(\/|$)/.test(p);
+
+  async function fetchSchema() {
+    try { const s = await API.pub('pub.schema'); try { localStorage.setItem('era.schema', JSON.stringify(s)); } catch (e) { } ERA.S.boot.schema = s; Shell.type = ''; Router.run(); } catch (e) { }
+  }
+  function applyBoot(d) {
+    const schema = ERA.S.boot.schema;
+    if (d.schemaVer && d.schemaVer !== schema.ver && !ERA.S._sf) { ERA.S._sf = 1; fetchSchema(); }
+    const sig = JSON.stringify(d);
+    if (sig === ERA.S.bootSig && !ERA.S.boot.loading) return;                  // data sama dengan yang sudah tampil → tidak render ulang
+    ERA.S.bootSig = sig; d.schema = schema; ERA.S.boot = d;
+    const fav = document.querySelector('link[rel=icon]'); if (fav && logoUrl() !== fav.href) fav.href = logoUrl();
+    const path = Router.cur.path;
+    if (/^\/(login|app)/.test(path)) return;
+    Shell.updateChrome();
+    if (needsBoot(path)) Router.run();
+  }
   async function boot() {
     Auth.load();
-    splash();
     if (!API.ready()) { $('#app').innerHTML = Views.setup(); return; }
+    const schema = currentSchema(); let cached = null;
+    try { cached = JSON.parse(localStorage.getItem('era.c.pub.boot.') || 'null'); } catch (e) { }
+    if (cached && cached.d && cached.d.stats) { ERA.S.boot = Object.assign({}, cached.d, { schema: schema }); ERA.S.bootSig = JSON.stringify(cached.d); }   // kunjungan ulang: data langsung tampil
+    else ERA.S.boot = placeholder(schema);
+    Router.run();                                                             // tampil SEKARANG (kerangka + skeleton) — data menyusul
     try {
-      await API.swr('pub.boot', {}, (d, cached) => {
-        ERA.S.boot = d;
-        const fav = document.querySelector('link[rel=icon]'); if (fav) fav.href = logoUrl();
-        if (!started) { started = true; Router.run(); }
-        else if (!cached && Shell.type === 'public' && Router.cur.path === '/') { Shell.type = ''; Router.run(); }
-      }, 120);
+      await API.swr('pub.boot', {}, d => applyBoot(d), 120);
     } catch (e) {
-      splash('<h2>Tidak dapat memuat portal</h2><p class="muted" style="max-width:46ch">' + esc(e.message) + '</p><button class="btn btn-p" onclick="location.reload()">Muat ulang</button>');
+      ERA.S.boot.loading = false; ERA.S.boot.error = e.message; if (needsBoot(Router.cur.path)) Router.run();
     }
+    if (Auth.on || localStorage.getItem('era.seenlogin')) (window.requestIdleCallback || (f => setTimeout(f, 2500)))(() => loadGIS().catch(() => { }));
   }
+  ERA.retryBoot = () => { ERA.S.boot.error = ''; ERA.S.boot.loading = true; Router.run(); API.swr('pub.boot', {}, d => applyBoot(d), 1).catch(e => { ERA.S.boot.loading = false; ERA.S.boot.error = e.message; Router.run(); }); };
+
+  // ---- prefetch saat niat terlihat (hover / sentuh) → klik berikutnya terasa instan ----
+  const PF = {
+    '/research/all': () => ['pub.list', { entity: 'research', page: 1, size: 9 }],
+    '/database/fish': () => ['pub.list', { entity: 'species', page: 1, size: 12, order: 'az', f_organismGroup: 'Ikan Air Tawar' }],
+    '/database/map': () => ['pub.map', {}],
+    '/news/all': () => ['pub.list', { entity: 'news', page: 1, size: 8 }],
+    '/publications/all': () => ['pub.list', { entity: 'publications', page: 1, size: 8 }],
+    '/gallery/all': () => ['pub.list', { entity: 'gallery', page: 1, size: 18 }],
+    '/expeditions/overview': () => ['pub.list', { entity: 'expeditions', size: 30 }],
+    '/conservation/all': () => ['pub.list', { entity: 'conservation', page: 1, size: 9 }],
+    '/knowledge/all': () => ['pub.list', { entity: 'knowledge', page: 1, size: 9 }]
+  };
+  let pt;
+  const intent = delay => e => {
+    const a = e.target.closest && e.target.closest('a[href^="#/"]'); if (!a) return;
+    clearTimeout(pt); pt = setTimeout(() => { const f = PF[a.getAttribute('href').slice(1)]; if (f) { const c = f(); API.prefetch(c[0], c[1]); } }, delay);
+  };
+  document.addEventListener('mouseover', intent(140), { passive: true });
+  document.addEventListener('touchstart', intent(0), { passive: true });
+
   document.addEventListener('DOMContentLoaded', boot);
   if (document.readyState !== 'loading') boot();
 })();

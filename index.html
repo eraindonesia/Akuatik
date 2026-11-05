@@ -12,27 +12,45 @@
 <meta name="theme-color" content="#0B2D4D">
 <link rel="icon" href="https://res.cloudinary.com/qzxx5soz/image/upload/f_auto,q_auto/Logo_ERA_crop">
 <script>try{var t=localStorage.getItem('era.theme');if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';document.documentElement.setAttribute('data-theme',t||'light')}catch(e){}</script>
+<!-- sambungan awal: memangkas ±300 ms per domain -->
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link rel="preconnect" href="https://res.cloudinary.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Source+Serif+4:ital,wght@0,600;1,500;1,600&display=swap">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
-<link rel="stylesheet" href="css/style.css">
+<!-- layar awal instan: tampil sebelum CSS/JS apa pun selesai diunduh -->
+<style>
+html{background:#fff}html[data-theme=dark]{background:#08131F}
+.boot{min-height:100vh;display:grid;place-items:center;font-family:Inter,system-ui,sans-serif;color:#5B7083}
+.boot>div{text-align:center}.boot img{height:56px;width:auto;display:block;margin:0 auto 18px;background:#fff;padding:5px 10px;border-radius:12px;border:1px solid #DCE6EC}
+.boot i{display:block;width:200px;height:6px;margin:0 auto 14px;border-radius:9px;background:linear-gradient(90deg,#DCE6EC 25%,#20B8B0 50%,#DCE6EC 75%);background-size:200% 100%;animation:bt 1.1s linear infinite}
+@keyframes bt{to{background-position:-200% 0}}
+</style>
+<!-- font tidak memblokir tampilan (fallback sistem lalu berganti) -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Source+Serif+4:ital,wght@0,600;1,500;1,600&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Source+Serif+4:ital,wght@0,600;1,500;1,600&display=swap"></noscript>
+<link rel="stylesheet" href="css/style.css?v=2026.11.2">
+<script src="js/config.js?v=2026.11.2"></script>
+<script>
+/* Permintaan data beranda DIMULAI SEKARANG, paralel dengan pengunduhan skrip (tidak menunggu aplikasi siap) */
+(function(){try{var u=(window.ERA_CONFIG||{}).GAS_URL||'';
+if(/^https:\/\/script\.google\.com\/(a\/[^/]+\/)?macros\/s\/[\w-]+\/exec/.test(u)){
+window.__bootP=fetch(u+'?action=pub.boot',{redirect:'follow'}).then(function(r){return r.json()}).catch(function(){return null});}}catch(e){}})();
+</script>
 </head>
 <body>
 <a class="skip" href="#main">Lewati ke konten</a>
-<div id="app" aria-live="polite"></div>
+<div id="app" aria-live="polite"><div class="boot"><div><img src="https://res.cloudinary.com/qzxx5soz/image/upload/f_auto,q_auto/Logo_ERA_crop" alt="Logo ERA"><i></i><span>Memuat portal…</span></div></div></div>
 <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 <div id="modal-root"></div>
 <noscript><p style="padding:24px;font-family:sans-serif">Portal ERA memerlukan JavaScript untuk ditampilkan.</p></noscript>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
-<script src="js/config.js" defer></script>
-<script src="js/core.js" defer></script>
-<script src="js/components.js" defer></script>
-<script src="js/public.js" defer></script>
-<script src="js/pages2.js" defer></script>
-<script src="js/admin.js" defer></script>
-<script src="js/admin2.js" defer></script>
-<script src="js/main.js" defer></script>
+<script src="js/schema.js?v=2026.11.2" defer></script>
+<script src="js/core.js?v=2026.11.2" defer></script>
+<script src="js/components.js?v=2026.11.2" defer></script>
+<script src="js/public.js?v=2026.11.2" defer></script>
+<script src="js/pages2.js?v=2026.11.2" defer></script>
+<script src="js/admin.js?v=2026.11.2" defer></script>
+<script src="js/admin2.js?v=2026.11.2" defer></script>
+<script src="js/main.js?v=2026.11.2" defer></script>
 </body>
 </html>

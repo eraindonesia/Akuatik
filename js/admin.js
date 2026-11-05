@@ -8,10 +8,20 @@ const titleOf = (entity, row) => row[SCH()[entity].title] || row.id;
 const entLabel = k => (SCH()[k] || {}).label || k;
 async function loadLists(force) {
   const L = ERA.S.lists; if (L && !force && Date.now() - L.t < 300000) return L;
-  const get = async (entity, fallbackEnt) => { try { return (await API.call('content.list', { entity: entity, size: 100, status: 'all' })).rows; } catch (e) { try { return (await API.pub('pub.list', { entity: fallbackEnt || entity, size: 60 })).rows; } catch (x) { return []; } } };
-  const [loc, spp] = await Promise.all([get('locations'), get('species')]);
-  ERA.S.lists = { t: Date.now(), locations: loc.map(r => ({ id: r.id, name: r.name, latitude: r.latitude, longitude: r.longitude })), species: spp.map(r => ({ id: r.id, name: r.scientificName })) };
-  return ERA.S.lists;
+  await fetchWithLists([], force); return ERA.S.lists;
+}
+/** SATU round-trip: daftar lokasi + spesies (bila cache basi) + panggilan tambahan milik halaman */
+async function fetchWithLists(extra, force) {
+  const L0 = ERA.S.lists, need = force || !L0 || Date.now() - L0.t > 300000, calls = [];
+  if (need) calls.push({ a: 'content.list', d: { entity: 'locations', size: 100, status: 'all' } }, { a: 'content.list', d: { entity: 'species', size: 100, status: 'all' } });
+  const n = calls.length; (extra || []).forEach(c => calls.push(c));
+  const res = calls.length ? await API.batch(calls) : [];
+  if (need) {
+    const pick = async (r, ent) => { if (r && r.success) return r.data.rows; try { return (await API.pub('pub.list', { entity: ent, size: 60 })).rows; } catch (e) { return []; } };
+    const [loc, spp] = await Promise.all([pick(res[0], 'locations'), pick(res[1], 'species')]);
+    ERA.S.lists = { t: Date.now(), locations: loc.map(r => ({ id: r.id, name: r.name, latitude: r.latitude, longitude: r.longitude })), species: spp.map(r => ({ id: r.id, name: r.scientificName })) };
+  }
+  return res.slice(n);
 }
 function addPicker() {
   const ks = Object.keys(SCH()).filter(k => Auth.can(SCH()[k].perm));
@@ -20,17 +30,20 @@ function addPicker() {
 }
 async function previewModal(entity, id) {
   try {
-    const d = await API.call('content.get', { entity: entity, id: id }), r = d.row, ex = await extraFor(entity, r);
+    const res = await fetchWithLists([{ a: 'content.get', d: { entity: entity, id: id } }].concat(entity === 'species' ? [{ a: 'content.list', d: { entity: 'distribution', size: 100, status: 'all', filterField: 'speciesId', filterValue: id } }] : []));
+    if (!res[0].success) throw new Error(res[0].message);
+    const r = res[0].data.row, ex = await extraFor(entity, r, res[1] && res[1].success ? res[1].data.rows : null);
     const m = Modal.open({ size: 'lg', title: 'Pratinjau — ' + titleOf(entity, r), body: `<div class="row" style="margin-bottom:14px">${stPill(r.status)}<span class="mono xs muted">${esc(r.id)}</span></div><div class="wm" id="pvx">${detailHtml(entity, r, ex)}</div>` });
     bindDetail($('#pvx', m.el), entity, r, ex);
   } catch (e) { toast(e.message, 'err'); }
 }
-async function extraFor(entity, r) {
+async function extraFor(entity, r, dist) {
   const x = {};
   try {
     const L = await loadLists();
     if (r.locationId) { const l = L.locations.filter(z => z.id === r.locationId)[0]; if (l) x.location = { name: l.name, latitude: l.latitude, longitude: l.longitude }; }
-    if (entity === 'species' && r.id) { const d = await API.call('content.list', { entity: 'distribution', size: 100, status: 'all', filterField: 'speciesId', filterValue: r.id }); x.distribution = d.rows; }
+    if (entity === 'species' && r.id && dist) x.distribution = dist;
+    else if (entity === 'species' && r.id) { const d = await API.call('content.list', { entity: 'distribution', size: 100, status: 'all', filterField: 'speciesId', filterValue: r.id }); x.distribution = d.rows; }
   } catch (e) { }
   return x;
 }
@@ -40,10 +53,9 @@ async function extraFor(entity, r) {
    ============================================================ */
 Pages.dash = async function (p, q, T) {
   const me = ERA.S.me, adm = me.role === 'admin', main = Shell.admin('dash', adm ? 'Console Desk' : 'My Workspace');
-  main.innerHTML = Views.loading(4, 'g4');
-  let d; try { d = await API.call('dash.get', {}); } catch (e) { if (T.ok()) main.innerHTML = errBox(e); return; }
-  if (!T.ok()) return; Shell.applyBadges(d);
-  if (adm) dashAdmin(main, d); else dashMember(main, d);
+  main.innerHTML = Views.loading(4, 'g4'); Libs.load('chart').catch(() => { });     // unduh Chart.js paralel dengan data
+  const show = d => { if (!T.ok()) return; Shell.applyBadges(d); if (adm) dashAdmin(main, d); else dashMember(main, d); };
+  try { await API.swrAuth('dash.get', {}, show); } catch (e) { if (T.ok()) main.innerHTML = errBox(e); }
 };
 function dashAdmin(main, d) {
   const k = d.kpi, kp = [['flask', 'Active Research', k.research, 'projects', ''], ['compass', 'Expeditions', k.expeditions, 'campaigns', ''], ['book', 'Publications', k.publications, 'papers', ''], ['fish', 'Documented Taxa', k.species, 'taxa', ''], ['clip', 'Pending Approvals', k.pending, 'awaiting review', 'a1'], ['inbox', 'Public Inquiries', k.inquiriesNew, 'new · ' + k.inquiriesTotal + ' total', 'a2']];
@@ -87,8 +99,9 @@ Pages.content = async function (p, q, T) {
   async function load() {
     const my = ++seq;
     try {
-      const d = await API.call('content.list', { entity: k, status: st.status, q: st.q, page: st.page, size: 15, filterField: st.filter ? E.filter : '', filterValue: st.filter });
-      if (my !== seq || !T.ok()) return; rows = d.rows; draw(d);
+      const args = { entity: k, status: st.status, q: st.q, page: st.page, size: 15, filterField: st.filter ? E.filter : '', filterValue: st.filter };
+      const show = d => { if (my !== seq || !T.ok()) return; rows = d.rows; draw(d); };
+      if (st.q) show(await API.call('content.list', args)); else await API.swrAuth('content.list', args, show);   // pencarian tidak di-cache
     } catch (e) { if (my === seq && T.ok()) tb.innerHTML = errBox(e); }
   }
   function draw(d) {
@@ -170,7 +183,7 @@ Pages.edit = async function (p, q, T) {
   const main = Shell.admin('c-' + k, E.label + (isNew ? ' / New' : ' / Edit')), adm = Auth.isAdmin;
   main.innerHTML = Views.lines(8);
   let row = {}, L;
-  try { L = await loadLists(); if (!isNew) { const d = await API.call('content.get', { entity: k, id: p.id }); row = d.row; if (!d.canEdit) { toast('Entri ini tidak dapat diubah (status: ' + row.status + ').', 'warn'); Router.go('/app/content/' + k, true); return; } } } catch (e) { if (T.ok()) main.innerHTML = errBox(e); return; }
+  try { const res = await fetchWithLists(isNew ? [] : [{ a: 'content.get', d: { entity: k, id: p.id } }]); L = ERA.S.lists; if (!isNew) { const g = res[0]; if (!g || !g.success) throw new Error((g && g.message) || 'Data tidak ditemukan.'); const d = g.data; row = d.row; if (!d.canEdit) { toast('Entri ini tidak dapat diubah (status: ' + row.status + ').', 'warn'); Router.go('/app/content/' + k, true); return; } } } catch (e) { if (T.ok()) main.innerHTML = errBox(e); return; }
   if (!T.ok()) return;
   const key = 'era.draft.' + k + '.' + (p.id || 'new');
   let local = null; try { local = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { }
@@ -190,8 +203,7 @@ Pages.edit = async function (p, q, T) {
   // koordinat + peta pemilih
   if (hasCoord) {
     const lat = form.elements.f_latitude, lng = form.elements.f_longitude, el = $('#pick'), pt = () => (isFinite(parseFloat(lat.value)) && isFinite(parseFloat(lng.value))) ? [parseFloat(lat.value), parseFloat(lng.value)] : null;
-    const m = MapKit.create(el, { center: pt() || [-2.2, 120.8], zoom: pt() ? 10 : 7 });
-    if (m) { let mk = null; const put = ll => { if (mk) mk.setLatLng(ll); else { mk = L_marker(ll, m, c => { lat.value = c.lat.toFixed(6); lng.value = c.lng.toFixed(6); form.dispatchEvent(new Event('input')); }); } }; if (pt()) put(pt()); m.on('click', e => { lat.value = e.latlng.lat.toFixed(6); lng.value = e.latlng.lng.toFixed(6); put([e.latlng.lat, e.latlng.lng]); form.dispatchEvent(new Event('input')); }); [lat, lng].forEach(i => i.addEventListener('change', () => { const c = pt(); if (c) { put(c); m.setView(c, Math.max(m.getZoom(), 10)); } })); }
+    MapKit.with(el, { center: pt() || [-2.2, 120.8], zoom: pt() ? 10 : 7 }, m => { let mk = null; const put = ll => { if (mk) mk.setLatLng(ll); else { mk = L_marker(ll, m, c => { lat.value = c.lat.toFixed(6); lng.value = c.lng.toFixed(6); form.dispatchEvent(new Event('input')); }); } }; if (pt()) put(pt()); m.on('click', e => { lat.value = e.latlng.lat.toFixed(6); lng.value = e.latlng.lng.toFixed(6); put([e.latlng.lat, e.latlng.lng]); form.dispatchEvent(new Event('input')); }); [lat, lng].forEach(i => i.addEventListener('change', () => { const c = pt(); if (c) { put(c); m.setView(c, Math.max(m.getZoom(), 10)); } })); });
   }
   form.addEventListener('change', e => {
     if (e.target.name === 'f_locationId' && hasCoord) { const l = L.locations.filter(x => x.id === e.target.value)[0]; if (l && isFinite(l.latitude) && !form.elements.f_latitude.value) { form.elements.f_latitude.value = l.latitude; form.elements.f_longitude.value = l.longitude; form.elements.f_latitude.dispatchEvent(new Event('change')); } }
@@ -267,8 +279,8 @@ async function distEditor(host, speciesId, L, adm) {
    ============================================================ */
 Pages.queue = async function (p, q, T) {
   const main = Shell.admin('queue', 'Approvals'); let tab = q.get('tab') || 'submitted'; main.innerHTML = Views.lines(6);
-  async function load() {
-    let d; try { d = await API.call('queue.list', { tab: tab }); } catch (e) { if (T.ok()) main.innerHTML = errBox(e); return; }
+  async function load() { try { await API.swrAuth('queue.list', { tab: tab }, render); } catch (e) { if (T.ok()) main.innerHTML = errBox(e); } }
+  function render(d) {
     if (!T.ok()) return;
     const tabs = [['submitted', 'Submitted'], ['returned', 'Returned for Revision'], ['approved', 'Approved & Ready'], ['rejected', 'Rejected / Archived']];
     main.innerHTML = head('Triage', 'Editorial Peer Review & Approval Workbench', 'Pemeriksaan kelengkapan, kualitas data, dan keputusan penerbitan.') + `<div class="pnl" style="margin-top:20px"><div class="ct-tabs">${tabs.map(t => `<button data-t="${t[0]}" class="${tab === t[0] ? 'on' : ''}">${t[1]}<i>${d.counts[t[0]]}</i></button>`).join('')}</div>${d.rows.length ? `<div class="tbl-w"><table class="tbl"><thead><tr><th>Title</th><th>Category</th><th>Submitter</th><th>Ver.</th><th>Updated</th><th>Status</th><th></th></tr></thead><tbody>${d.rows.map(r => `<tr><td><b>${esc(r.title)}</b><div class="code">${esc(r.id)}</div>${r.reviewNote && tab === 'returned' ? `<div class="xs muted" style="margin-top:4px"><i>“${esc(r.reviewNote.slice(0, 90))}”</i></div>` : ''}</td><td><span class="badge">${esc(r.entityLabel)}</span></td><td class="sm">${esc(r.createdByName || '—')}</td><td class="mono xs">v${r.version}</td><td class="muted sm">${esc(ago(r.updatedAt))}</td><td>${stPill(r.status)}</td><td><a class="btn btn-p btn-sm" href="#/app/review/${r.entity}/${esc(r.id)}">${tab === 'submitted' ? 'Review' : 'Buka'}</a></td></tr>`).join('')}</tbody></table></div>` : Views.empty(tab === 'submitted' ? 'All caught up' : 'Tidak ada entri', tab === 'submitted' ? 'Tidak ada konten yang menunggu review.' : '', '', 'checkC')}</div>`;
@@ -306,7 +318,13 @@ Pages.review = async function (p, q, T) {
   const k = p.entity, E = SCH()[k]; if (!E) { Router.go('/app', true); return; }
   const main = Shell.admin('queue', 'Approvals / Review'); main.innerHTML = Views.lines(8);
   let d, v, r, ex;
-  try { d = await API.call('content.get', { entity: k, id: p.id }); r = d.row; [v, ex] = await Promise.all([API.call('versions.list', { entity: k, id: p.id }), extraFor(k, r)]); } catch (e) { if (T.ok()) main.innerHTML = errBox(e); return; }
+  try {
+    const calls = [{ a: 'content.get', d: { entity: k, id: p.id } }, { a: 'versions.list', d: { entity: k, id: p.id } }];
+    if (k === 'species') calls.push({ a: 'content.list', d: { entity: 'distribution', size: 100, status: 'all', filterField: 'speciesId', filterValue: p.id } });
+    const res = await fetchWithLists(calls);
+    if (!res[0].success) throw new Error(res[0].message); if (!res[1].success) throw new Error(res[1].message);
+    d = res[0].data; r = d.row; v = res[1].data; ex = await extraFor(k, r, res[2] && res[2].success ? res[2].data.rows : null);
+  } catch (e) { if (T.ok()) main.innerHTML = errBox(e); return; }
   if (!T.ok()) return;
   const chk = qualityChecks(E, r), pass = chk.filter(c => c[0] === 'o').length, blocked = chk.some(c => c[0] === 'b'), prev = v.versions.filter(x => x.snapshot && String(x.version) !== String(r.version))[0];
   const dec = r.status;

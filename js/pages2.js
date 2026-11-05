@@ -110,7 +110,9 @@ function identification(host) {
 function speciesDistributionMap(host, T) {
   host.innerHTML = `<div class="map-full"><aside class="map-side" id="ms"><div class="eyebrow">Geospatial filter engine</div><h3 style="margin:6px 0 12px">Lapisan & Taksa Spesies <span class="badge" id="mc"></span></h3><div class="inp-ic">${icon('search')}<input class="inp" id="mq" placeholder="Cari taksa…" aria-label="Cari taksa"></div><div id="mf">${Views.lines(6)}</div></aside><div class="map-box"><div class="map" id="bigmap"></div><div style="position:absolute;top:12px;right:12px;z-index:500" class="row"><div class="row" style="gap:0;background:var(--card);border-radius:10px;box-shadow:var(--sh2)"><button class="btn btn-sm btn-p" data-b="osm">Peta</button><button class="btn btn-sm btn-o" data-b="sat" style="border:0">Citra Satelit</button></div></div></div></div>
   <div class="wrap"><div class="leg"><span>${dot('#20B8B0')} Spesies endemik</span><span>${dot('#0B2D4D')} Non-endemik</span><span>${dot('#F59E0B')} Terancam (CR/EN)</span><span>◆ Lokasi riset / stasiun</span></div></div>`;
-  const map = MapKit.create($('#bigmap'), { zoom: 7 }); if (!map) return;
+  MapKit.with($('#bigmap'), { zoom: 7 }, map => speciesMapInit(host, T, map));
+}
+function speciesMapInit(host, T, map) {
   const layer = L.layerGroup().addTo(map), locL = L.layerGroup().addTo(map);
   let data = { points: [], locations: [] }; const st = { q: '', lake: '', groups: new Set(), endemic: false, sp: new Set(), all: true };
   $$('[data-b]', host).forEach(b => b.onclick = () => { MapKit.base(map, b.dataset.b); $$('[data-b]', host).forEach(x => { x.className = 'btn btn-sm ' + (x === b ? 'btn-p' : 'btn-o'); x.style.border = x === b ? '' : '0'; }); });
@@ -231,7 +233,7 @@ Pages.contact = function (p) {
     const st = (ERA.S.boot.home.locations || []).filter(l => l.kind === 'station' || l.kind === 'research');
     host.innerHTML = `<div class="split" style="grid-template-columns:1fr 1.2fr"><div class="col">${[['pin', 'Alamat', setting('ADDRESS')], ['mail', 'Email', setting('EMAIL')], ['phone', 'Telepon / WhatsApp', setting('PHONE')], ['clock', 'Jam layanan', setting('OFFICE_HOURS')]].map(c => `<div class="card pad row" style="flex-wrap:nowrap;align-items:flex-start"><div class="stat" style="padding:0;border:0"><div class="ico">${icon(c[0], 's24')}</div></div><div><div class="mono xs muted">${c[1].toUpperCase()}</div><div>${esc(c[2] || '—')}</div></div></div>`).join('')}</div><div class="map" id="cmap" style="min-height:360px"></div></div>
     <div class="card pad" style="margin-top:36px;max-width:720px" id="stc"><h3>${icon('search')} Cek status pengajuan</h3><p class="muted sm">Masukkan nomor referensi dari email tanda terima beserta alamat email pengaju.</p><form id="stf" class="grid g2" style="gap:12px">${fld('Nomor referensi', 'ref', { req: 1, ph: 'ERA-INQ-2026-0001' })}${fld('Email pengaju', 'email', { req: 1, type: 'email' })}<div><button class="btn btn-p" type="submit">Cek Status</button></div></form><div id="stres" style="margin-top:14px"></div></div>`;
-    const m = MapKit.create($('#cmap'), { wheel: false }); if (m) { const pts = []; st.forEach(l => { if (isFinite(l.latitude)) { pts.push([l.latitude, l.longitude]); MapKit.dot(l.latitude, l.longitude, '#20B8B0', 10).addTo(m).bindPopup('<b>' + esc(l.name) + '</b>'); } }); MapKit.fit(m, pts); }
+    MapKit.with($('#cmap'), { wheel: false }, m => { const pts = []; st.forEach(l => { if (isFinite(l.latitude)) { pts.push([l.latitude, l.longitude]); MapKit.dot(l.latitude, l.longitude, '#20B8B0', 10).addTo(m).bindPopup('<b>' + esc(l.name) + '</b>'); } }); MapKit.fit(m, pts); });
     $('#stf').addEventListener('submit', async e => { e.preventDefault(); const fd = new FormData(e.target), r = $('#stres'); r.innerHTML = Views.lines(2); try { const d = await API.pub('pub.status', { ref: fd.get('ref'), email: fd.get('email') }); r.innerHTML = `<div class="notice ok">${icon('checkC')}<div><b>${esc(d.ref)}</b> — ${esc(d.type)}<br>Status: <b>${esc(d.statusLabel)}</b><br><span class="xs">Diterima ${esc(fmtDT(d.createdAt))} · Diperbarui ${esc(fmtDT(d.updatedAt))}</span></div></div>`; } catch (er) { r.innerHTML = `<div class="notice bad">${icon('alert')}<div>${esc(er.message)}</div></div>`; } });
   } else if (sub === 'message' || sub === 'partnership') {
     host.innerHTML = `<div class="card pad" id="fcard" style="max-width:820px;margin:auto"><div class="mono xs muted">FORMULIR // ${sub === 'message' ? 'KORESPONDENSI RESMI' : 'PARTNERSHIP INQUIRY'}</div>${formHtml(sub)}</div>`;
@@ -270,6 +272,13 @@ Pages.search = async function (p, qp, T) {
 /* ============================================================
    LOGIN
    ============================================================ */
+let _gis = null;
+function loadGIS() {
+  if (window.google && google.accounts) return Promise.resolve();
+  if (_gis) return _gis;
+  _gis = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true; sc.onload = () => res(); sc.onerror = () => { _gis = null; rej(new Error('Layanan Google tidak dapat dimuat.')); }; document.head.appendChild(sc); });
+  return _gis;
+}
 Pages.login = async function (p, qp, T) {
   if (Auth.on) { Router.go(qp.get('next') || '/app', true); return; }
   Shell.type = '';
@@ -284,11 +293,15 @@ Pages.login = async function (p, qp, T) {
   <hr style="border:0;border-top:1px solid var(--border);margin:22px 0"><a href="#/" class="sm">${icon('arrowL', 's16')} Kembali ke situs publik</a></div></div></div>`;
   $('#lt').onclick = () => Theme.toggle();
   const err = m => { const e = $('#lerr'); e.classList.toggle('hide', !m); e.innerHTML = icon('alert') + '<div>' + esc(m || '') + '</div>'; };
-  const done = d => { Auth.save(d.token, d.me); Shell.type = ''; toast('Selamat datang, ' + (d.me.nama || d.me.email) + '.'); Router.go(next.indexOf('/') === 0 ? next : '/app'); };
+  const done = d => { try { localStorage.setItem('era.seenlogin', '1'); } catch (x) { } Auth.save(d.token, d.me); Shell.type = ''; toast('Selamat datang, ' + (d.me.nama || d.me.email) + '.'); Router.go(next.indexOf('/') === 0 ? next : '/app'); };
   $('#te').onclick = () => $('#ef').classList.toggle('hide');
   $('#ef').onsubmit = async e => { e.preventDefault(); const fd = new FormData(e.target), b = $('#eb'); b.disabled = true; b.textContent = 'Memeriksa…'; err(''); try { const r = await API.post('auth.darurat', { username: fd.get('username'), password: fd.get('password') }, { noauth: true }); if (!r.success) throw new Error(r.message); done(r.data); } catch (x) { err(x.message); b.disabled = false; b.textContent = 'Masuk'; } };
   if (!ready) { $('#gbtn').innerHTML = '<div class="notice warn">' + icon('alert') + '<div>Backend belum terhubung. Isi <code>GAS_URL</code> di <code>js/config.js</code>.</div></div>'; return; }
-  let cfg; try { cfg = await API.pub('auth.config'); } catch (x) { $('#gbtn').innerHTML = ''; err(x.message); $('#ef').classList.remove('hide'); return; }
+  const gis = loadGIS();                                               // unduh skrip Google LANGSUNG, paralel dengan auth.config
+  let cfg = null; try { cfg = JSON.parse(localStorage.getItem('era.authcfg') || 'null'); } catch (x) { }
+  const fresh = API.pub('auth.config').then(c => { try { localStorage.setItem('era.authcfg', JSON.stringify(c)); } catch (x) { } return c; });
+  if (!cfg) { try { cfg = await fresh; } catch (x) { $('#gbtn').innerHTML = ''; err(x.message); $('#ef').classList.remove('hide'); return; } } else fresh.catch(() => { });   // konfigurasi tersimpan → tombol muncul tanpa menunggu server
+  if (!T.ok()) return;
   if (!cfg.googleClientId) { $('#gbtn').innerHTML = '<div class="notice info">' + icon('info') + '<div class="sm">Login Google belum dikonfigurasi. Masuk dengan akses darurat, lalu isi <b>Google Client ID</b> di Settings → Security.</div></div>'; $('#ef').classList.remove('hide'); return; }
   const init = () => {
     try {
@@ -296,5 +309,5 @@ Pages.login = async function (p, qp, T) {
       $('#gbtn').innerHTML = ''; google.accounts.id.renderButton($('#gbtn'), { theme: Theme.get() === 'dark' ? 'filled_black' : 'outline', size: 'large', width: 340, text: 'signin_with', shape: 'rectangular' });
     } catch (x) { $('#gbtn').innerHTML = ''; err('Tidak dapat memuat tombol Google. Gunakan akses darurat.'); }
   };
-  if (window.google && google.accounts) init(); else { const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true; s.onload = init; s.onerror = () => { $('#gbtn').innerHTML = ''; err('Layanan Google tidak dapat dimuat. Periksa koneksi atau gunakan akses darurat.'); }; document.head.appendChild(s); }
+  gis.then(init).catch(() => { $('#gbtn').innerHTML = ''; err('Layanan Google tidak dapat dimuat. Periksa koneksi atau gunakan akses darurat.'); });
 };

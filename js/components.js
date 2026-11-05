@@ -110,6 +110,13 @@ const Shell = {
   bindPublic() {
     $('#dm').addEventListener('click', e => { if (e.target.id === 'dm' || e.target.closest('a')) $('#dm').classList.remove('open'); });
   },
+  updateChrome() {   // data boot asli tiba setelah kerangka tampil: segarkan footer, nama & logo tanpa menggambar ulang halaman
+    if (this.type !== 'public') return;
+    const f = $('.foot'); if (f) f.outerHTML = this.footer();
+    const b = $('.nav .brand b'), t = $('.nav .brand small'), im = $('.nav .logo-img');
+    if (b) b.textContent = setting('SITE_NAME', 'Ekspedisi Riset Akuatik'); if (t) t.textContent = setting('SITE_TAGLINE', 'ERA LIMNOLOGY & MARINE PORTAL');
+    if (im && im.getAttribute('src') !== logoUrl()) im.src = logoUrl();
+  },
   searchBox() {
     const m = Modal.open({ title: 'Cari di portal ERA', body: '<form id="gs"><div class="inp-ic">' + icon('search') + '<input class="inp" name="q" placeholder="Nama spesies, penelitian, publikasi, lokasi…" aria-label="Kata kunci" autocomplete="off" required minlength="2"></div><p class="help">Contoh: <a href="#/search?q=oryzias" data-x>oryzias</a>, <a href="#/search?q=matano" data-x>matano</a>, <a href="#/search?q=konservasi" data-x>konservasi</a></p></form>' });
     m.el.querySelectorAll('[data-x]').forEach(a => a.addEventListener('click', () => m.close()));
@@ -204,13 +211,18 @@ function downloadB64(name, mime, b64) { const bin = atob(b64), u = new Uint8Arra
 /* ---------- peta (Leaflet) ---------- */
 const MapKit = {
   ok() { return typeof L !== 'undefined'; },
+  with(el, o, cb) {   // muat Leaflet hanya saat dibutuhkan (tidak menahan tampil pertama)
+    if (!el) return;
+    Libs.load('leaflet').then(() => { if (!el.isConnected) return; const m = MapKit.create(el, o); if (m) cb(m); })
+      .catch(e => { el.innerHTML = '<div class="empty">' + icon('globe', 's32') + '<p>' + esc(e.message) + '</p></div>'; });
+  },
   create(el, o) {
-    o = o || {};
+    o = o || {}; if (el._m) { try { el._m.remove(); } catch (e) { } }
     if (!this.ok()) { el.innerHTML = '<div class="empty">' + icon('globe', 's32') + '<p>Library peta belum termuat. Muat ulang halaman.</p></div>'; return null; }
     const m = L.map(el, { center: o.center || [-2.2, 120.8], zoom: o.zoom || 7, scrollWheelZoom: o.wheel !== false, attributionControl: true });
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
     const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18, attribution: 'Tiles © Esri' });
-    osm.addTo(m); m._b = { osm: osm, sat: sat, cur: 'osm' };
+    osm.addTo(m); m._b = { osm: osm, sat: sat, cur: 'osm' }; el._m = m;
     Router.cleanup(() => { try { m.remove(); } catch (e) { } });
     setTimeout(() => m.invalidateSize(), 200); return m;
   },
@@ -222,9 +234,12 @@ const MapKit = {
 /* ---------- grafik (Chart.js) ---------- */
 const Charts = {
   pal: ['#0B2D4D', '#20B8B0', '#145B78', '#8CC7E0', '#E8D8B0', '#7995BB', '#53dad1', '#F59E0B'],
-  make(canvas, cfg) {
+  make(canvas, cfg) {   // Chart.js dimuat malas; pemanggil tidak memakai nilai kembaliannya
     if (!canvas) return null;
-    if (typeof Chart === 'undefined') { canvas.parentNode.innerHTML = '<div class="empty">Library grafik belum termuat.</div>'; return null; }
+    Libs.load('chart').then(() => { if (canvas.isConnected) Charts._make(canvas, cfg); }).catch(() => { if (canvas.parentNode) canvas.parentNode.innerHTML = '<div class="empty">Grafik tidak dapat dimuat.</div>'; });
+    return null;
+  },
+  _make(canvas, cfg) {
     const cs = getComputedStyle(document.documentElement);
     Chart.defaults.color = cs.getPropertyValue('--muted').trim() || '#5B7083'; Chart.defaults.font.family = 'Inter, sans-serif'; Chart.defaults.borderColor = cs.getPropertyValue('--border').trim() || '#DCE6EC';
     cfg.options = Object.assign({ responsive: true, maintainAspectRatio: false }, cfg.options || {});

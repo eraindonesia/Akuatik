@@ -33,7 +33,9 @@ Browser ──► GitHub Pages (index.html, css/, js/)
    - *Execute as*: **Me**
    - *Who has access*: **Anyone**
    - **Deploy** → salin **Web app URL** (berakhiran `/exec`).
-7. Opsional tapi disarankan: jalankan fungsi **`pasangTriggerBackup`** sekali → cadangan otomatis harian.
+7. Opsional tapi disarankan — jalankan sekali dari editor:
+   - **`pasangTriggerPemanasan`** → cache publik dipanaskan tiap 10 menit, sehingga pengunjung tidak pernah menanggung "cold start" Apps Script (**paling berpengaruh pada kecepatan**).
+   - **`pasangTriggerBackup`** → cadangan otomatis harian.
 
 > **Setiap kali Anda mengubah kode backend:** *Deploy → Manage deployments → ✏ → Version: New version → Deploy*. URL tetap sama.
 
@@ -76,6 +78,7 @@ Upload via web menggugurkan struktur folder `css/` dan `js/` sehingga halaman ta
 4. Tunggu 1–3 menit. Situs: `https://USERNAME.github.io/era-portal/`
 
 **Update berikutnya:** `git add .` → `git commit -m "update"` → `git push`.
+> Setelah mengubah berkas `js/` atau `css/`, naikkan angka `?v=...` pada tag `<script>`/`<link>` di `index.html` (mis. `2026.11.2` → `2026.11.3`) agar browser pengunjung mengambil versi baru, bukan salinan lama.
 
 ---
 
@@ -137,8 +140,15 @@ Lalu lintas ±1.000 pengunjung/hari aman: halaman publik dilayani dari cache ser
 | Data baru tidak muncul di publik | Cache publik ± hingga 15 menit di browser pengunjung; muat ulang keras (Ctrl+F5). |
 | Lupa kata sandi darurat | Apps Script → jalankan `resetAksesDarurat` → lihat log. |
 
+## Kecepatan — cara kerjanya
+- Halaman **tampil seketika** dari kerangka + data tersimpan di browser (stale-while-revalidate); data baru menyusul di latar belakang.
+- Permintaan data beranda dimulai di `<head>`, paralel dengan unduhan skrip. Peta (Leaflet) dan grafik (Chart.js) hanya dimuat saat dibutuhkan.
+- Cache server berversi bertahan hingga 6 jam dan **dibangun ulang otomatis saat Anda menerbitkan/mengubah konten** (juga tiap 10 menit bila trigger pemanasan dipasang).
+- Panel CMS memakai *batch* (beberapa data dalam satu round-trip), cache per pengguna, dan prefetch saat kursor mendekati menu.
+- Bila Anda mengubah struktur data di `Skema.gs`, naikkan `SCHEMA_VER`; frontend akan mengambil skema baru otomatis.
+
 ## Daftar fungsi pemeliharaan (jalankan dari editor Apps Script)
-`setupAppEnvironment` (aman diulang) · `hapusDataContoh` · `pasangTriggerBackup` · `resetAksesDarurat` · `rotasiSecretSesi` (mencabut semua sesi)
+`setupAppEnvironment` (aman diulang) · `hapusDataContoh` · `pasangTriggerPemanasan` · `pasangTriggerBackup` · `resetAksesDarurat` · `rotasiSecretSesi` (mencabut semua sesi)
 
 ## Batasan yang jujur
 - Tampilan memakai **ilustrasi pengganti** sampai Anda mengunggah foto asli.

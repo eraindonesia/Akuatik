@@ -11,7 +11,10 @@ Pages.inquiries = async function (p, q, T) {
   main.innerHTML = head('Public & institutional', 'Public Inquiries Inbox', 'Pengajuan kolaborasi, kemitraan, relawan, dan pesan dari formulir publik.', `<button class="btn btn-o" id="xi">${icon('download', 's16')} Export CSV</button>`) + `<div class="pnl" style="margin-top:20px"><div class="ct-tabs" id="it"></div><div class="filters" style="grid-template-columns:2fr 1fr auto;box-shadow:none;margin-bottom:16px"><div><label class="f" for="iq">Cari</label><div class="inp-ic">${icon('search')}<input class="inp" id="iq" type="search" placeholder="Nama, email, institusi, nomor ref…"></div></div><div><label class="f" for="is">Status</label><select class="inp" id="is"><option value="all">Semua</option>${Object.keys(INQ_ST).map(k => `<option value="${k}">${INQ_ST[k][0]}</option>`).join('')}</select></div><button class="btn btn-o" id="ir">Reset</button></div><div id="ib">${Views.lines(5)}</div></div>`;
   async function load() {
     const my = ++seq;
-    try { const d = await API.call('inq.list', { type: st.type, status: st.status, q: st.q, page: st.page, size: 15 }); if (my !== seq || !T.ok()) return; data = d; draw(); } catch (e) { if (my === seq && T.ok()) $('#ib', main).innerHTML = errBox(e); }
+    try {
+      const args = { type: st.type, status: st.status, q: st.q, page: st.page, size: 15 }, show = d => { if (my !== seq || !T.ok()) return; data = d; draw(); };
+      if (st.q) show(await API.call('inq.list', args)); else await API.swrAuth('inq.list', args, show);
+    } catch (e) { if (my === seq && T.ok()) $('#ib', main).innerHTML = errBox(e); }
   }
   function draw() {
     const d = data;
@@ -131,6 +134,7 @@ Pages.pdf = async function (p, q, T) {
    REPORTS & STATISTICS
    ============================================================ */
 Pages.stats = async function (p, q, T) {
+  Libs.load('chart').catch(() => { });
   const main = Shell.admin('stats', 'Reports & Statistics'), f = { from: '', to: '' }; let last = null;
   main.innerHTML = head('Analytics', 'Reports & Statistics', 'Ringkasan data penelitian, ekspedisi, taksa, dan publikasi.', `<button class="btn btn-o" id="xs">${icon('download', 's16')} Export CSV</button>`) + `<div class="filters" style="grid-template-columns:1fr 1fr auto auto;margin-top:20px"><div><label class="f" for="sf1">Dibuat dari</label><input class="inp" id="sf1" type="date"></div><div><label class="f" for="sf2">Sampai</label><input class="inp" id="sf2" type="date"></div><button class="btn btn-p" id="sa">Apply</button><button class="btn btn-o" id="sr">Reset</button></div><div id="sb">${Views.lines(6)}</div>`;
   async function load() {

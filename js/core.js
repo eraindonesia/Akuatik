@@ -6,7 +6,7 @@ const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 
 /* ---------- util ---------- */
 function esc(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-function qs(o) { return Object.keys(o || {}).filter(k => o[k] !== '' && o[k] !== undefined && o[k] !== null).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(o[k])).join('&'); }
+function qs(o) { return Object.keys(o || {}).sort().filter(k => o[k] !== '' && o[k] !== undefined && o[k] !== null).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(o[k])).join('&'); }
 function slug(s) { return String(s || '').toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
 function hash(s) { let h = 0; s = String(s); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); }
 function debounce(fn, ms) { let t; return function () { const a = arguments, c = this; clearTimeout(t); t = setTimeout(() => fn.apply(c, a), ms); }; }
@@ -116,52 +116,110 @@ ERA.imgErr = function (el) {
   } else fb();
 };
 
+/* ---------- pemuat pustaka malas (Leaflet & Chart.js tidak lagi menahan tampil pertama) ---------- */
+const Libs = {
+  _p: {},
+  def: {
+    leaflet: { ok: () => typeof L !== 'undefined', js: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js', css: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css' },
+    chart: { ok: () => typeof Chart !== 'undefined', js: 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js' }
+  },
+  load(name) {
+    const d = this.def[name]; if (d.ok()) return Promise.resolve();
+    if (this._p[name]) return this._p[name];
+    this._p[name] = new Promise((res, rej) => {
+      if (d.css) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = d.css; document.head.appendChild(l); }
+      const sc = document.createElement('script'); sc.src = d.js; sc.async = true; sc.onload = () => res();
+      sc.onerror = () => { delete Libs._p[name]; rej(new Error('Gagal memuat pustaka ' + name + '. Periksa koneksi internet.')); };
+      document.head.appendChild(sc);
+    });
+    return this._p[name];
+  },
+  idle(name) { const f = () => Libs.load(name).catch(() => { }); (window.requestIdleCallback || (fn => setTimeout(fn, 1800)))(f); }
+};
+
 /* ---------- API client + cache SWR (gas-instant-ux) ---------- */
+const WRITE_RE = /^(content\.(save|submit|review|delete|bulk)|inq\.update|file\.(upload|update|delete)|user\.save|settings\.save|org\.save|pdf\.generate|backup\.run)$/;
 const API = {
+  _inf: {},
   url() { return (window.ERA_CONFIG && window.ERA_CONFIG.GAS_URL) || ''; },
   ready() { return /^https:\/\/script\.google\.com\/(a\/[^/]+\/)?macros\/s\/[\w-]+\/exec/.test(this.url()); },
-  async _fetch(url, opt) {
+  async _fetch(url, opt, retry) {
     const c = new AbortController(), t = setTimeout(() => c.abort(), 45000);
     try {
       const r = await fetch(url, Object.assign({ signal: c.signal, redirect: 'follow' }, opt || {}));
-      return await r.json();
+      const txt = await r.text();
+      try { return JSON.parse(txt); } catch (e) { const er = new Error('Server memberi respons tak terduga. Coba lagi sebentar lagi.'); er.soft = true; throw er; }
     } catch (e) {
+      if (retry > 0 && !(opt && opt.method)) { clearTimeout(t); await new Promise(r => setTimeout(r, 600)); return this._fetch(url, opt, retry - 1); }   // GET aman diulang
+      if (e.soft) throw e;
       throw new Error(e.name === 'AbortError' ? 'Waktu tunggu habis. Periksa koneksi Anda lalu coba lagi.' : 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
     } finally { clearTimeout(t); }
   },
-  async get(action, params) {
-    if (!this.ready()) throw new Error('Alamat backend belum diatur. Isi GAS_URL di js/config.js.');
-    return this._fetch(this.url() + '?' + qs(Object.assign({ action: action }, params || {})));
+  _need() { if (!this.ready()) throw new Error('Alamat backend belum diatur. Isi GAS_URL di js/config.js.'); },
+  get(action, params) {
+    this._need();
+    const url = this.url() + '?' + qs(Object.assign({ action: action }, params || {}));
+    if (this._inf[url]) return this._inf[url];                               // permintaan identik dibagi (tidak dobel)
+    const p = this._fetch(url, null, 1).finally(() => { delete API._inf[url]; });
+    return (this._inf[url] = p);
   },
   async post(action, data, opt) {
-    if (!this.ready()) throw new Error('Alamat backend belum diatur. Isi GAS_URL di js/config.js.');
-    const res = await this._fetch(this.url(), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: action, token: (opt && opt.noauth) ? '' : ERA.S.token, data: data || {} }) });
+    this._need();
+    const res = await this._fetch(this.url(), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: action, token: (opt && opt.noauth) ? '' : ERA.S.token, data: data || {} }) }, 0);
     if (res && !res.success && res.code === 'AUTH' && ERA.S.token) { Auth.clear(); toast('Sesi berakhir. Silakan masuk kembali.', 'warn'); Router.go('/login'); }
+    if (res && res.success && WRITE_RE.test(action)) this.pruneAuth();       // cache admin dibuang setelah penulisan agar tak menampilkan data basi
     return res;
   },
-  /** panggil + lempar error bila gagal */
   async call(action, data, opt) { const r = await this.post(action, data, opt); if (!r.success) { const e = new Error(r.message || 'Gagal'); e.code = r.code; throw e; } return r.data; },
   async pub(action, params) { const r = await this.get(action, params); if (!r.success) { const e = new Error(r.message || 'Gagal memuat data'); e.code = r.code; throw e; } return r.data; },
-  /** stale-while-revalidate untuk GET publik */
+  /** BANYAK pembacaan internal dalam SATU round-trip. Mengembalikan array {success,data,message,code} */
+  batch(calls) { return this.call('batch.run', { calls: calls }); },
+  pubBatch(calls) { return this.pub('pub.batch', { calls: JSON.stringify(calls) }); },
+  /** stale-while-revalidate untuk GET publik: tampil dari cache seketika, lalu segarkan di latar belakang */
   async swr(action, params, cb, ttl) {
     ttl = ttl || (window.ERA_CONFIG.CACHE_TTL_SEC || 300);
     const key = 'era.c.' + action + '.' + qs(params);
     let hit = null; try { hit = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { }
     if (hit) { cb(hit.d, true); if (Date.now() - hit.t < ttl * 500) return; }
     let data;
-    try { data = await this.pub(action, params); } catch (e) { if (hit) return; throw e; }
+    try {
+      if (action === 'pub.boot' && window.__bootP) {                          // permintaan yang sudah berjalan sejak <head>
+        const bp = window.__bootP; window.__bootP = null; const r = await bp;
+        data = r && r.success ? r.data : await this.pub(action, params);
+      } else data = await this.pub(action, params);
+    } catch (e) { if (hit) return; throw e; }
     const s = JSON.stringify(data);
     if (!hit || JSON.stringify(hit.d) !== s) cb(data, false);
     try { if (s.length < 350000) localStorage.setItem(key, JSON.stringify({ t: Date.now(), d: data })); } catch (e) { API.prune(); }
   },
-  prune() { Object.keys(localStorage).filter(k => k.indexOf('era.c.') === 0).forEach(k => localStorage.removeItem(k)); }
+  /** SWR untuk data internal (per pengguna). Cache dibuang saat logout / setelah penulisan. */
+  async swrAuth(action, data, cb) {
+    const me = ERA.S.me, key = 'era.a.' + (me ? me.email : '') + '.' + action + '.' + JSON.stringify(data || {});
+    let hit = null; try { hit = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { }
+    if (hit && Date.now() - hit.t < 6 * 3600e3) cb(hit.d, true); else hit = null;
+    let d;
+    try { d = await this.call(action, data); } catch (e) { if (hit) { toast('Menampilkan data tersimpan — gagal menyegarkan: ' + e.message, 'warn'); return hit.d; } throw e; }
+    const s = JSON.stringify(d);
+    if (!hit || JSON.stringify(hit.d) !== s) cb(d, false);
+    try { if (s.length < 300000) localStorage.setItem(key, JSON.stringify({ t: Date.now(), d: d })); } catch (e) { this.pruneAuth(); }
+    return d;
+  },
+  /** muat lebih awal saat pengguna menunjukkan niat (hover / sentuh) */
+  prefetch(action, params) {
+    if (!this.ready()) return;
+    const key = 'era.c.' + action + '.' + qs(params); let h = null; try { h = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { }
+    if (h && Date.now() - h.t < 150000) return;
+    this.swr(action, params, () => { }).catch(() => { });
+  },
+  prune() { Object.keys(localStorage).filter(k => k.indexOf('era.c.') === 0).forEach(k => localStorage.removeItem(k)); },
+  pruneAuth() { Object.keys(localStorage).filter(k => k.indexOf('era.a.') === 0).forEach(k => localStorage.removeItem(k)); }
 };
 
 /* ---------- sesi ---------- */
 const Auth = {
   load() { try { const s = JSON.parse(localStorage.getItem('era.sess') || 'null'); if (s && s.token && s.exp > Date.now()) { ERA.S.token = s.token; ERA.S.me = s.me; } else this.clear(true); } catch (e) { this.clear(true); } },
   save(token, me) { ERA.S.token = token; ERA.S.me = me; localStorage.setItem('era.sess', JSON.stringify({ token: token, me: me, exp: Date.now() + 11.5 * 3600e3 })); },
-  clear(quiet) { ERA.S.token = ''; ERA.S.me = null; try { localStorage.removeItem('era.sess'); } catch (e) { } if (!quiet) { try { Object.keys(localStorage).filter(k => k.indexOf('era.draft.') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) { } } },
+  clear(quiet) { ERA.S.token = ''; ERA.S.me = null; try { localStorage.removeItem('era.sess'); API.pruneAuth(); } catch (e) { } if (!quiet) { try { Object.keys(localStorage).filter(k => k.indexOf('era.draft.') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) { } } },
   get isAdmin() { return !!(ERA.S.me && ERA.S.me.role === 'admin'); },
   get on() { return !!(ERA.S.token && ERA.S.me); },
   can(perm) { const m = ERA.S.me; if (!m) return false; if (m.role === 'admin') return true; if (perm === 'admin') return false; return String(m.categories || '').split(',').map(s => s.trim()).indexOf(perm) >= 0; }
