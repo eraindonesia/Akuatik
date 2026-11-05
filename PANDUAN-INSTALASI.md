@@ -88,7 +88,12 @@ Selama Client ID belum diisi, hanya **akses darurat** yang bisa masuk — itu no
 
 1. <https://console.cloud.google.com> → buat project → **APIs & Services → OAuth consent screen** (External, isi nama aplikasi & email) → tambahkan akun Anda sebagai *Test user* (atau *Publish app* bila siap).
 2. **Credentials → Create credentials → OAuth client ID → Web application**.
-   - *Authorized JavaScript origins*: `https://USERNAME.github.io` ← **tanpa** `/era-portal` dan tanpa garis miring di akhir.
+   - *Authorized JavaScript origins*: alamat situs Anda **persis**, tanpa path dan tanpa garis miring di akhir. Contoh:
+     - GitHub Pages: `https://USERNAME.github.io`
+     - Vercel: `https://nama-proyek.vercel.app`
+     - Domain sendiri: `https://www.contoh.id`
+     - Alamat yang harus didaftarkan juga ditampilkan di halaman login (**Login Google bermasalah?**) dan di **Settings → Security**, lengkap dengan tombol Salin.
+     - Setiap alamat berbeda (domain utama, domain kustom, atau URL *preview* Vercel) harus didaftarkan sendiri-sendiri.
 3. Salin **Client ID** (berakhiran `.apps.googleusercontent.com`).
 4. Buka portal → `#/login` → **Gunakan akses darurat** (kredensial dari A5) → **Settings → Security** → tempel Client ID → **Simpan**.
 5. Segera **rotasi kredensial darurat** pada kartu di sebelahnya.
@@ -133,7 +138,9 @@ Lalu lintas ±1.000 pengunjung/hari aman: halaman publik dilayani dari cache ser
 | Layar "Backend belum terhubung" | `GAS_URL` belum diisi / salah. Harus berakhiran `/exec`. |
 | "Tidak dapat terhubung ke server" | Deployment bukan *Anyone*, atau belum *New version* setelah ubah kode. |
 | Halaman tanpa gaya, console 404 `css/…` | Struktur folder rusak (upload via web). Ulangi B2–B3 lewat terminal. |
-| Tombol Google tidak muncul | Client ID belum diisi, atau *Authorized JavaScript origins* tidak cocok persis dengan domain GitHub Pages. |
+| **Error 400: origin_mismatch** (Akses diblokir) | Alamat situs belum terdaftar di *Authorized JavaScript origins* pada OAuth Client ID. Tambahkan alamat persis (lihat C-2), simpan, tunggu 5 menit–beberapa jam, lalu muat ulang dengan Ctrl+F5. Pastikan jenis klien **Web application**. |
+| Tombol Google tidak muncul | Client ID belum diisi, atau *Authorized JavaScript origins* tidak cocok persis dengan alamat situs. |
+| "Access blocked: app has not completed verification" | OAuth consent screen masih mode *Testing*: tambahkan email Anda di **Test users**, atau tekan *Publish app*. |
 | "Email … belum terdaftar" | Tambahkan email itu di **Users** (harus sama dengan akun Google yang dipakai). |
 | Unggah gambar gagal | Format tidak diizinkan / > batas MB; atau kebijakan Workspace melarang berbagi publik (ubah ke berkas internal / kebijakan Drive). |
 | PDF gagal | Buka Apps Script → **Executions** untuk pesan galat; pastikan izin Documents sudah diberikan (jalankan ulang fungsi apa pun dan *Allow*). |
