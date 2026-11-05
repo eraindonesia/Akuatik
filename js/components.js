@@ -71,9 +71,11 @@ const Shell = {
   fresh(id) { const o = $('#' + id); if (!o) return null; const n = o.cloneNode(false); o.replaceWith(n); return n; },   // buang listener rute sebelumnya
   fitNav() {   // menu otomatis menjadi tombol ☰ bila tidak muat (berlaku di zoom / lebar layar berapa pun)
     const nav = $('.nav'), ul = nav && $('.menu', nav); if (!ul) return;
-    nav.classList.remove('compact');
-    const need = Array.from(ul.children).reduce((a, li) => a + li.getBoundingClientRect().width, 0);
-    if (need > ul.clientWidth - 6) nav.classList.add('compact');
+    const over = () => Array.from(ul.children).reduce((a, li) => a + li.getBoundingClientRect().width, 0) > ul.clientWidth - 6;
+    nav.classList.remove('tight'); nav.classList.remove('compact');
+    if (!over()) return;                         // 1) susunan penuh muat
+    nav.classList.add('tight');                  // 2) rapat: tagline & label tombol disembunyikan, jarak diperkecil
+    if (over()) nav.classList.add('compact');    // 3) tetap tak muat → tombol ☰
   },
   bindOnce() {
     if (this._g) return; this._g = 1;

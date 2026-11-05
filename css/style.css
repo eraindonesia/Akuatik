@@ -260,3 +260,19 @@ pre.json{background:#001830;color:#BFE9FF;border-radius:12px;padding:16px;overfl
 .hero.img{background-color:#001830}
 .banner h1{text-shadow:0 2px 16px rgba(0,24,48,.35)}
 @media(max-width:620px){.hero-main h1{font-size:30px}.nav .wrap{gap:8px}}
+
+/* ---------- header v3: logo proporsional + menu horizontal ---------- */
+.brand .mk.logo,.mk.logo{width:auto;min-width:0;height:44px;padding:0;background:transparent;border:0;border-radius:0;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.mk.logo .logo-img{height:44px;width:auto;max-width:132px;object-fit:contain;display:block}
+.side .lg .mk.logo,.side .lg .mk.logo .logo-img{height:40px}
+.foot .mk.logo .logo-img{height:42px}
+.login-l .mk.logo .logo-img{height:52px}
+.nav .wrap{padding:0 20px;max-width:1600px;gap:12px}
+.brand{gap:10px}.brand b{font-size:12.5px;letter-spacing:.03em;line-height:15px}.brand small{font-size:9.5px;line-height:13px;letter-spacing:.04em}
+.menu>li>a{padding:26px 6px;font-size:13px}
+.menu>li>a .ic{width:12px;height:12px;margin-left:1px}
+.nav-r{gap:6px}
+.nav.tight .brand small{display:none}
+.nav.tight .menu>li>a{padding:26px 4px;font-size:12.5px}
+.nav.tight #nav-login span{display:none}.nav.tight #nav-login{padding:6px;min-width:36px}
+@media(max-width:620px){.mk.logo .logo-img{height:38px;max-width:96px}.brand .mk.logo,.mk.logo{height:38px}}

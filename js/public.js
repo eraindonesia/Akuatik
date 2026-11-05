@@ -83,7 +83,9 @@ Pages.home = function () {
   const B = ERA.S.boot, H = B.home, st = B.stats, org = B.org || {}, ld = !!B.loading;
   const main = Shell.public('home');
   if (B.error) { main.innerHTML = '<div class="wrap sec"><div class="empty">' + icon('alert', 's32') + '<h3>Tidak dapat memuat data portal</h3><p>' + esc(B.error) + '</p><button class="btn btn-p" onclick="ERA.retryBoot()">' + icon('refresh', 's16') + ' Coba lagi</button></div></div>'; return; }
-  const heroImg = validUrl(setting('HERO_IMAGE')) && setting('HERO_IMAGE') !== logoUrl() ? setting('HERO_IMAGE') : '';   // logo bukan foto hero
+  const base = u => String(u).split('?')[0].split('/').pop().replace(/\.[a-z0-9]+$/i, '').toLowerCase();
+  const isLogo = u => base(u) === base(logoUrl()) || /logo/.test(base(u));
+  const heroImg = validUrl(setting('HERO_IMAGE')) && !isLogo(setting('HERO_IMAGE')) ? setting('HERO_IMAGE') : '';   // logo bukan foto hero
   const intro = String(org.who || '').split(/\n\s*\n/)[0];
   const locs = H.locations || [];
   main.innerHTML = `
