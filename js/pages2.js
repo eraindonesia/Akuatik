@@ -41,20 +41,21 @@ function speciesCatalogue(host, forced) {
   let seq = 0, last = [];
   const groups = OPTS().orgGroup.filter(g => !forced.exclude || g !== forced.exclude);
   const ecos = (ERA.S.boot.home.locations || []).filter(l => /Danau/.test(l.ecosystem) || l.kind === 'research').map(l => l.name);
-  host.innerHTML = `<div class="sp-layout"><aside class="fside" aria-label="Filter taksonomi"><h4>Pencarian</h4><div class="inp-ic">${icon('search')}<input class="inp" id="sq" type="search" placeholder="Nama ilmiah, lokal, famili…" aria-label="Cari spesies"></div>
+  host.innerHTML = `<button class="btn btn-o fs-open" type="button">${icon('filter', 's16')} Filter &amp; urutkan <span class="badge b-solid" id="fcnt" hidden></span></button><div class="fs-bd"></div><div class="sp-layout"><aside class="fside sheet" aria-label="Filter taksonomi"><div class="fs-head"><b>Filter taksonomi</b><button type="button" class="btn btn-o btn-ic" data-fclose aria-label="Tutup">${icon('x')}</button></div><h4>Pencarian</h4><div class="inp-ic">${icon('search')}<input class="inp" id="sq" type="search" placeholder="Nama ilmiah, lokal, famili…" aria-label="Cari spesies"></div>
     ${forced.group ? '' : `<h4>Kelompok Organisme</h4><label class="chk"><input type="radio" name="g" value="" checked> Semua <span class="muted xs" data-gc=""></span></label>${groups.map(g => `<label class="chk"><input type="radio" name="g" value="${esc(g)}"> ${esc(g)} <span class="muted xs" data-gc="${esc(g)}"></span></label>`).join('')}`}
     ${forced.endemic ? '' : `<h4>Endemisitas</h4><label class="chk"><input type="radio" name="e" value="" checked> Semua</label><label class="chk"><input type="radio" name="e" value="yes"> Endemik</label><label class="chk"><input type="radio" name="e" value="no"> Non-endemik</label>`}
     <h4>Status IUCN Red List</h4><select class="inp" id="si" aria-label="IUCN"><option value="">Semua status</option>${OPTS().iucn.map(i => `<option value="${i}">${i} — ${IUCN_L[i]}</option>`).join('')}</select>
     <h4>Cekungan Limnologis</h4><select class="inp" id="se" aria-label="Cekungan"><option value="">Semua cekungan</option>${ecos.map(e => `<option>${esc(e)}</option>`).join('')}</select>
     <h4>Urutkan</h4><select class="inp" id="so" aria-label="Urutan"><option value="az">Nama ilmiah (A–Z)</option><option value="new">Terbaru</option></select>
-    <button class="btn btn-o btn-block" id="sr" style="margin-top:18px">Reset filter</button></aside>
+    <button class="btn btn-o btn-block" id="sr" style="margin-top:18px">Reset filter</button><button class="btn btn-p btn-block fs-apply" type="button">Lihat hasil</button></aside>
     <div><div class="row sp" style="margin-bottom:18px"><div class="mono xs muted" id="cnt" aria-live="polite">MEMUAT…</div><div class="row"><button class="btn btn-o btn-sm" id="exp">${icon('download', 's16')} CSV</button><div class="row" style="gap:0"><button class="btn btn-sm btn-p" data-v="grid" aria-label="Tampilan kartu">${icon('grid', 's16')}</button><button class="btn btn-sm btn-o" data-v="table" aria-label="Tampilan tabel">${icon('list', 's16')}</button></div></div></div><div id="res"></div></div></div>`;
-  const res = $('#res', host);
+  const res = $('#res', host); Mobile.sheet(host, '.fside.sheet');
   async function run() {
     const my = ++seq, size = st.view === 'table' ? 20 : 12, clientEx = forced.exclude && !st.group;
     const p = { entity: 'species', page: clientEx ? 1 : st.page, size: clientEx ? 60 : size, order: st.order };
     if (st.q) p.q = st.q; if (st.group) p.f_organismGroup = st.group; if (st.endemic) p.f_endemic = st.endemic; if (st.iucn) p.f_iucn = st.iucn; if (st.eco) p.f_ecosystemTags = st.eco;
     res.innerHTML = Views.loading(6, st.view === 'grid' ? 'g3' : 'g1');
+    const nf = ['group', 'endemic', 'iucn', 'eco'].filter(k => st[k] && st[k] !== (forced[k === 'group' ? 'group' : k] || '')).length + (st.q ? 1 : 0), fc = $('#fcnt', host); if (fc) { fc.textContent = nf; fc.hidden = !nf; }
     try {
       await API.swr('pub.list', p, d => {
         if (my !== seq || !host.isConnected) return;
@@ -63,7 +64,7 @@ function speciesCatalogue(host, forced) {
         last = rows; $('#cnt', host).textContent = `MENAMPILKAN ${rows.length} DARI ${total} TAKSA TERDAFTAR (DARWIN CORE)`;
         const f = d.facets.organismGroup || {}; $$('[data-gc]', host).forEach(s => { const g = s.dataset.gc; s.textContent = '(' + (g ? (f[g] || 0) : Object.values(f).reduce((a, b) => a + b, 0)) + ')'; });
         if (!rows.length) { res.innerHTML = Views.empty('Tidak ada spesies yang cocok', 'Coba longgarkan filter.', '<button class="btn btn-o btn-sm" id="sr2">Reset filter</button>'); const b = $('#sr2'); if (b) b.onclick = reset; return; }
-        res.innerHTML = (st.view === 'grid' ? `<div class="grid g3">${rows.map(Cards.species).join('')}</div>` :
+        res.innerHTML = (st.view === 'grid' ? `<div class="grid g3 sp-grid">${rows.map(Cards.species).join('')}</div>` :
           `<div class="tbl-w"><table class="tbl"><thead><tr><th>Foto</th><th>Nama Ilmiah</th><th>Nama Lokal</th><th>Kelompok</th><th>Famili</th><th>Endemik</th><th>IUCN</th></tr></thead><tbody>${rows.map(r => `<tr><td><div class="thumb">${img(r.photoUrl, r.scientificName, r.id, 'fish')}</div></td><td><a href="${viewLink('species', r.id)}" class="it"><b>${esc(r.scientificName)}</b></a><div class="code">${esc(r.id)}</div></td><td>${esc(r.localName || '—')}</td><td>${esc(r.organismGroup || '')}</td><td>${esc(r.family || '')}</td><td>${r.endemic === 'yes' ? '<span class="badge b-solid">Ya</span>' : '—'}</td><td>${iucnBadge(r.iucn) || '—'}</td></tr>`).join('')}</tbody></table></div>`) + pager(total, st.page, size);
       });
     } catch (e) { if (my === seq) pageErr(res, e); }
@@ -108,8 +109,9 @@ function identification(host) {
 
 /* ---- peta persebaran ---- */
 function speciesDistributionMap(host, T) {
-  host.innerHTML = `<div class="map-full"><aside class="map-side" id="ms"><div class="eyebrow">Geospatial filter engine</div><h3 style="margin:6px 0 12px">Lapisan & Taksa Spesies <span class="badge" id="mc"></span></h3><div class="inp-ic">${icon('search')}<input class="inp" id="mq" placeholder="Cari taksa…" aria-label="Cari taksa"></div><div id="mf">${Views.lines(6)}</div></aside><div class="map-box"><div class="map" id="bigmap"></div><div style="position:absolute;top:12px;right:12px;z-index:500" class="row"><div class="row" style="gap:0;background:var(--card);border-radius:10px;box-shadow:var(--sh2)"><button class="btn btn-sm btn-p" data-b="osm">Peta</button><button class="btn btn-sm btn-o" data-b="sat" style="border:0">Citra Satelit</button></div></div></div></div>
+  host.innerHTML = `<div class="fs-bd"></div><div class="map-full"><aside class="map-side sheet" id="ms"><div class="fs-head"><b>Filter peta</b><button type="button" class="btn btn-o btn-ic" data-fclose aria-label="Tutup">${icon('x')}</button></div><div class="eyebrow">Geospatial filter engine</div><h3 style="margin:6px 0 12px">Lapisan & Taksa Spesies <span class="badge" id="mc"></span></h3><div class="inp-ic">${icon('search')}<input class="inp" id="mq" placeholder="Cari taksa…" aria-label="Cari taksa"></div><div id="mf">${Views.lines(6)}</div></aside><div class="map-box"><div class="map" id="bigmap"></div><button class="btn btn-p fs-open" type="button">${icon('filter', 's16')} Filter taksa</button><div style="position:absolute;top:12px;right:12px;z-index:500" class="row"><div class="row" style="gap:0;background:var(--card);border-radius:10px;box-shadow:var(--sh2)"><button class="btn btn-sm btn-p" data-b="osm">Peta</button><button class="btn btn-sm btn-o" data-b="sat" style="border:0">Citra Satelit</button></div></div></div></div>
   <div class="wrap"><div class="leg"><span>${dot('#20B8B0')} Spesies endemik</span><span>${dot('#0B2D4D')} Non-endemik</span><span>${dot('#F59E0B')} Terancam (CR/EN)</span><span>◆ Lokasi riset / stasiun</span></div></div>`;
+  Mobile.sheet(host, '.map-side.sheet');
   MapKit.with($('#bigmap'), { zoom: 7 }, map => speciesMapInit(host, T, map));
 }
 function speciesMapInit(host, T, map) {
@@ -281,7 +283,7 @@ function loadGIS() {
 }
 Pages.login = async function (p, qp, T) {
   if (Auth.on) { Router.go(qp.get('next') || '/app', true); return; }
-  Shell.type = '';
+  Shell.type = ''; if (document.body) document.body.classList.remove('has-tabbar');
   const next = qp.get('next') || '/app';
   const ready = API.ready();
   $('#app').innerHTML = `<div class="login-wrap"><div class="login-l"><a class="brand" href="#/" style="color:#fff!important"><span class="mk logo">${logoMark()}</span><span><b>${esc(setting('SITE_NAME', 'Ekspedisi Riset Akuatik'))}</b><small style="color:#9FC0DA">ERA LIMNOLOGY &amp; MARINE PORTAL</small></span></a><div><div class="eyebrow" style="color:#53dad1">Internal Back-Office</div><h1 style="margin-top:12px">Ruang kerja riset, kurasi, dan penerbitan data ilmiah.</h1><p style="color:#C7D9E9;max-width:46ch">Masuk untuk mengelola penelitian, ekspedisi, katalog spesies, spesimen, dan publikasi.</p></div><div class="mono xs" style="color:#8FAAC4">DATUM WGS84 · OPEN ACCESS CC-BY-NC 4.0</div></div>

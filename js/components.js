@@ -64,6 +64,24 @@ function buildMenu() {
   ];
 }
 
+/* ---------- navigasi bawah (ponsel) ---------- */
+const TAB_PUB = '<nav class="tabbar" aria-label="Navigasi cepat">' + [['home', '/', 'Beranda', 'home'], ['research', '/research/all', 'Riset', 'flask'], ['database', '/database/fish', 'Katalog', 'fish'], ['news', '/news/all', 'Berita', 'file']].map(t => '<a href="#' + t[1] + '" data-k="' + t[0] + '">' + icon(t[3]) + '<span>' + t[2] + '</span></a>').join('') + '<button type="button" data-act="burger" aria-label="Menu lainnya">' + icon('menu') + '<span>Menu</span></button></nav>';
+
+/* ---------- util ponsel: tabel → kartu (label kolom diambil dari <thead>) ---------- */
+const Mobile = {
+  label(tbl) {
+    if (tbl._lb) return; const heads = Array.from(tbl.querySelectorAll('thead th')).map(th => String(th.textContent || '').trim()); if (!heads.length) return; tbl._lb = 1;
+    Array.from(tbl.querySelectorAll('tbody tr')).forEach(tr => { let titled = false; Array.from(tr.children).forEach((td, i) => { const l = heads[i] || ''; td.setAttribute('data-label', l); if (!titled && l && !td.querySelector('input[type=checkbox]')) { td.setAttribute('data-title', '1'); titled = true; } }); });
+  },
+  scan(root) { Array.from((root || document).querySelectorAll('table.tbl')).forEach(t => Mobile.label(t)); },
+  init() { if (this._i || typeof MutationObserver === 'undefined') return; this._i = 1; const run = debounce(() => Mobile.scan(document), 60); new MutationObserver(run).observe($('#app'), { childList: true, subtree: true }); },
+  sheet(host, sel) {   // filter / panel samping menjadi bottom sheet di ponsel
+    const el = host.querySelector(sel), bd = host.querySelector('.fs-bd'); if (!el) return;
+    const set = on => { el.classList.toggle('open', on); if (bd) bd.classList.toggle('on', on); };
+    host.addEventListener('click', e => { if (e.target.closest('.fs-open')) set(true); else if (e.target.closest('[data-fclose]') || e.target.closest('.fs-apply') || e.target.classList.contains('fs-bd')) set(false); });
+  }
+};
+
 /* ---------- Shell: kerangka halaman ---------- */
 const Shell = {
   type: '', menu: null,
@@ -79,13 +97,17 @@ const Shell = {
   },
   bindOnce() {
     if (this._g) return; this._g = 1;
+    Mobile.init();
+    $('#app').addEventListener('click', e => { if (e.target.id === 'sbd') Shell.toggleSide(false); });
     window.addEventListener('resize', debounce(() => Shell.fitNav(), 120));
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => Shell.fitNav());
     $('#app').addEventListener('click', async e => {
       const b = e.target.closest('[data-act]'); if (!b) return;
       if (b.dataset.act === 'theme') Theme.toggle();
       if (b.dataset.act === 'burger') { const d = $('#dm'); if (d) d.classList.toggle('open'); }
-      if (b.dataset.act === 'search') Shell.searchBox();
+      if (b.dataset.act === 'search') { const d = $('#dm'); if (d) d.classList.remove('open'); Shell.searchBox(); }
+      if (b.dataset.act === 'add' && typeof addPicker === 'function') addPicker();
+      if (b.dataset.act === 'side') Shell.toggleSide();
       if (b.dataset.act === 'logout') { try { await API.post('auth.logout'); } catch (x) { } Auth.clear(); Shell.type = ''; toast('Sesi diakhiri.'); Router.go('/'); }
     });
   },
@@ -100,11 +122,13 @@ const Shell = {
         '<ul class="menu" role="menubar">' + m.map(i => '<li data-k="' + i.k + '"><a href="#' + i.path + '/' + (i.subs[0][0]) + '" role="menuitem">' + esc(i.label) + (i.subs.length > 1 ? icon('chevD', 's16') : '') + '</a><div class="mega" role="menu">' + i.subs.map(s => '<a href="#' + i.path + '/' + s[0] + '" role="menuitem">' + icon('chevR', 's16') + esc(s[1]) + '</a>').join('') + '</div></li>').join('') + '</ul>' +
         '<div class="nav-r"><button class="btn btn-o btn-ic" data-act="search" aria-label="Cari">' + icon('search') + '</button><button class="btn btn-o btn-ic" data-theme-ic data-act="theme" aria-label="Ganti tema">' + icon(Theme.get() === 'dark' ? 'sun' : 'moon') + '</button><a class="btn btn-o btn-sm" id="nav-login" href="#/login">' + icon('user', 's16') + '<span>Member Login</span></a><button class="btn btn-o btn-ic burger" data-act="burger" aria-label="Menu">' + icon('menu') + '</button></div></div></header>' +
         '<main id="main" tabindex="-1"></main>' + this.footer() +
-        '<div class="drawer-m" id="dm"><nav aria-label="Menu utama"><div class="row sp" style="margin-bottom:8px"><b>Menu</b><button class="btn btn-o btn-ic" data-act="burger" aria-label="Tutup">' + icon('x') + '</button></div><a class="btn btn-o btn-block" href="#/" style="margin-bottom:8px">Beranda</a>' + m.map(i => '<details><summary>' + esc(i.label) + icon('chevD', 's16') + '</summary>' + i.subs.map(s => '<a href="#' + i.path + '/' + s[0] + '">' + esc(s[1]) + '</a>').join('') + '</details>').join('') + '</nav></div>';
+        '<div class="drawer-m" id="dm"><nav aria-label="Menu utama"><div class="row sp" style="margin-bottom:8px"><b>Menu</b><button class="btn btn-o btn-ic" data-act="burger" aria-label="Tutup">' + icon('x') + '</button></div><div class="row" style="margin-bottom:12px;gap:8px;flex-wrap:nowrap"><a class="btn btn-p" id="dm-login" href="#/login" style="flex:1">' + icon('user', 's16') + '<span>Member Login</span></a><button class="btn btn-o btn-ic" data-theme-ic data-act="theme" aria-label="Ganti tema">' + icon(Theme.get() === 'dark' ? 'sun' : 'moon') + '</button><button class="btn btn-o btn-ic" data-act="search" aria-label="Cari">' + icon('search') + '</button></div><a class="btn btn-o btn-block" href="#/" style="margin-bottom:8px">Beranda</a>' + m.map(i => '<details><summary>' + esc(i.label) + icon('chevD', 's16') + '</summary>' + i.subs.map(s => '<a href="#' + i.path + '/' + s[0] + '">' + esc(s[1]) + '</a>').join('') + '</details>').join('') + '</nav></div>' + TAB_PUB;
       this.bindPublic();
     }
     this.bindOnce(); this.fitNav(); requestAnimationFrame(() => Shell.fitNav());
     $$('.menu>li').forEach(li => li.classList.toggle('act', li.dataset.k === active));
+    const dl = $('#dm-login'); if (dl) { dl.href = Auth.on ? '#/app' : '#/login'; dl.querySelector('span').textContent = Auth.on ? 'Dashboard' : 'Member Login'; }
+    $$('.tabbar [data-k]').forEach(a => a.classList.toggle('on', a.dataset.k === active)); if (document.body) document.body.classList.add('has-tabbar');
     const nl = $('#nav-login'); if (nl) { nl.href = Auth.on ? '#/app' : '#/login'; nl.querySelector('span').textContent = Auth.on ? 'Dashboard' : 'Member Login'; }
     $('#dm') && $('#dm').classList.remove('open');
     return this.fresh('main');
@@ -139,6 +163,7 @@ const Shell = {
     if (this.type !== 'admin') {
       this.type = 'admin';
       const sch = ERA.S.boot.schema.entities, can = k => Auth.can(sch[k].perm);
+      const tabAdm = '<nav class="tabbar" aria-label="Navigasi CMS"><a href="#/app" data-k="dash">' + icon('grid') + '<span>Beranda</span></a><a href="' + (adm ? '#/app/queue' : '#/app/revisions') + '" data-k="' + (adm ? 'queue' : 'rev') + '">' + icon('clip') + '<span>' + (adm ? 'Approval' : 'Revisi') + '</span><b class="tb-n" id="tbn" hidden></b></a><button type="button" class="tb-fab" data-act="add" aria-label="Tambah data">' + icon('plus', 's24') + '</button><a href="#/app/files" data-k="files">' + icon('folder') + '<span>Berkas</span></a><button type="button" data-act="side" aria-label="Menu">' + icon('menu') + '<span>Menu</span></button></nav>';
       const ent = Object.keys(sch).filter(k => can(k) && !['team', 'partners'].includes(k)).map(k => '<a class="it" href="#/app/content/' + k + '" data-k="c-' + k + '">' + icon({ research: 'flask', expeditions: 'compass', locations: 'pin', species: 'fish', distribution: 'globe', specimens: 'layers', conservation: 'leaf', publications: 'book', news: 'file', gallery: 'image', events: 'cal', knowledge: 'db' }[k] || 'file') + sch[k].label + '</a>').join('');
       const admOnly = adm ? '<a class="it" href="#/app/content/team" data-k="c-team">' + icon('users') + 'Team</a><a class="it" href="#/app/content/partners" data-k="c-partners">' + icon('handshake') + 'Partners</a>' : '';
       $('#app').innerHTML = '<div class="cms"><aside class="side" id="side" aria-label="Navigasi CMS"><div class="lg"><span class="on">● ONLINE</span><span class="mk logo" style="display:inline-flex;margin-bottom:10px">' + logoMark() + '</span><br><b>ERA CMS</b><small>EKSPEDISI RISET AKUATIK</small></div>' +
@@ -151,21 +176,23 @@ const Shell = {
         (adm ? '<a class="it" href="#/app/users" data-k="users">' + icon('users') + 'Users</a><a class="it" href="#/app/audit" data-k="audit">' + icon('hist') + 'Audit Logs</a><a class="it" href="#/app/settings" data-k="settings">' + icon('cog') + 'Settings</a>' : '') +
         '<div class="ft"><a class="it" href="#/" style="padding:6px 0">' + icon('globe', 's16') + ' Lihat situs publik</a><button class="btn btn-w btn-sm btn-block" data-act="logout" style="margin-top:8px">' + icon('logout', 's16') + ' End Session</button></div></aside>' +
         '<div><div class="ctop"><button class="btn btn-o btn-ic" id="sbt" aria-label="Menu" style="display:none">' + icon('menu') + '</button><div class="crumbs" id="crumbs"></div><div class="right row"><button class="btn btn-o btn-ic" data-theme-ic data-act="theme" aria-label="Ganti tema">' + icon(Theme.get() === 'dark' ? 'sun' : 'moon') + '</button><a class="btn btn-o btn-ic" href="' + (adm ? '#/app/queue' : '#/app/revisions') + '" aria-label="Notifikasi" style="position:relative">' + icon('bell') + '<span class="n" id="bell" hidden style="position:absolute;top:-4px;right:-4px;background:#DC2626;color:#fff;border-radius:99px;font:700 10px var(--f-sans);padding:1px 6px"></span></a>' +
-        '<div style="text-align:right;line-height:1.25"><b class="sm">' + esc(me.nama || me.email) + '</b><div class="xs muted">' + (me.darurat ? 'Akses Darurat' : esc(me.title || (adm ? 'Administrator' : 'Member'))) + '</div></div></div></div><main class="cmain" id="cmain" tabindex="-1"></main></div></div>';
+        '<div style="text-align:right;line-height:1.25"><b class="sm">' + esc(me.nama || me.email) + '</b><div class="xs muted">' + (me.darurat ? 'Akses Darurat' : esc(me.title || (adm ? 'Administrator' : 'Member'))) + '</div></div></div></div><main class="cmain" id="cmain" tabindex="-1"></main></div>' + tabAdm + '<div class="side-bd" id="sbd"></div></div>';
       this.bindAdmin();
     }
     this.bindOnce();
     $$('.side a.it').forEach(a => a.classList.toggle('on', a.dataset.k === active));
+    $$('.tabbar [data-k]').forEach(a => a.classList.toggle('on', a.dataset.k === active)); if (document.body) document.body.classList.add('has-tabbar');
     $('#crumbs').innerHTML = 'ERA / <b>' + esc((crumbs || 'Panel')) + '</b>';
-    $('#side').classList.remove('open');
+    this.toggleSide(false);
     this.refreshBadges();
     return this.fresh('cmain');
   },
   bindAdmin() {
     const mq = matchMedia('(max-width:980px)'), sync = () => { const b = $('#sbt'); if (b) b.style.display = mq.matches ? 'inline-flex' : 'none'; };
     sync(); if (mq.addEventListener) mq.addEventListener('change', sync);
-    $('#sbt').onclick = () => $('#side').classList.toggle('open');
+    $('#sbt').onclick = () => Shell.toggleSide();
   },
+  toggleSide(force) { const s = $('#side'), b = $('#sbd'); if (!s) return; const on = force === undefined ? !s.classList.contains('open') : force; s.classList.toggle('open', on); if (b) b.classList.toggle('on', on); },
   _rb: 0,
   async refreshBadges(force) {
     if (!force && Date.now() - this._rb < 12000) return; this._rb = Date.now();
@@ -175,6 +202,7 @@ const Shell = {
   applyBadges(d) {
     ERA.S.dash = d; this._rb = Date.now();
     const set = (id, n) => { const el = $('#' + id); if (el) { el.textContent = n; el.hidden = !n; } };
+    set('tbn', d.role === 'admin' ? d.queueCounts.submitted : d.counts.returned);
     if (d.role === 'admin') { set('bq', d.queueCounts.submitted); set('bi', d.kpi.inquiriesNew); set('bell', d.queueCounts.submitted + d.kpi.inquiriesNew); }
     else { set('br', d.counts.returned); set('bell', d.counts.returned); }
   }

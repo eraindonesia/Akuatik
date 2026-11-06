@@ -36,7 +36,7 @@ const Cards = {
 };
 function pubRow(r) {
   const open = (validUrl(r.fileUrl) ? r.fileUrl : '') || (validUrl(r.link) ? r.link : ''), cite = `${r.authors} (${r.year}). ${r.title}.${r.journal ? ' ' + r.journal + '.' : ''}${r.doi ? ' https://doi.org/' + String(r.doi).replace(/^https?:\/\/doi.org\//, '') : ''}`;
-  return `<article class="card" style="display:grid;grid-template-columns:96px 1fr auto;gap:20px;padding:18px;align-items:start"><div style="width:96px;aspect-ratio:3/4;border-radius:10px;overflow:hidden;border:1px solid var(--border)">${img(r.coverUrl, r.title, r.id, 'doc')}</div><div><div class="row" style="gap:8px;margin-bottom:6px"><span class="badge b-navy">${esc(r.pubType)}</span><span class="mono xs muted">${esc(r.year)}</span>${r.accessType === 'open' ? '<span class="badge b-solid">Open Access</span>' : ''}</div><h3 style="font-size:19px;margin:0 0 4px">${esc(r.title)}</h3><div class="muted sm">${esc(r.authors)}${r.journal ? ' · <i>' + esc(r.journal) + '</i>' : ''}</div><p class="muted sm clamp" style="margin:8px 0 0">${esc(r.snippet || '')}</p>${r.doi ? `<div class="mono xs" style="margin-top:8px">DOI: ${esc(r.doi)}</div>` : ''}</div><div class="col" style="min-width:150px"><button class="btn btn-o btn-sm" data-abs="${esc(r.id)}">${icon('eye', 's16')} Abstract</button>${open ? `<a class="btn btn-p btn-sm" href="${esc(open)}" target="_blank" rel="noopener noreferrer">${icon(validUrl(r.fileUrl) ? 'download' : 'ext', 's16')} ${validUrl(r.fileUrl) ? 'Unduh PDF' : 'Tautan'}</a>` : ''}<button class="btn btn-o btn-sm" data-cite="${esc(cite)}">${icon('copy', 's16')} Sitasi</button></div></article>`;
+  return `<article class="card pub-row" style="display:grid;grid-template-columns:96px 1fr auto;gap:20px;padding:18px;align-items:start"><div style="width:96px;aspect-ratio:3/4;border-radius:10px;overflow:hidden;border:1px solid var(--border)">${img(r.coverUrl, r.title, r.id, 'doc')}</div><div><div class="row" style="gap:8px;margin-bottom:6px"><span class="badge b-navy">${esc(r.pubType)}</span><span class="mono xs muted">${esc(r.year)}</span>${r.accessType === 'open' ? '<span class="badge b-solid">Open Access</span>' : ''}</div><h3 style="font-size:19px;margin:0 0 4px">${esc(r.title)}</h3><div class="muted sm">${esc(r.authors)}${r.journal ? ' · <i>' + esc(r.journal) + '</i>' : ''}</div><p class="muted sm clamp" style="margin:8px 0 0">${esc(r.snippet || '')}</p>${r.doi ? `<div class="mono xs" style="margin-top:8px">DOI: ${esc(r.doi)}</div>` : ''}</div><div class="col" style="min-width:150px"><button class="btn btn-o btn-sm" data-abs="${esc(r.id)}">${icon('eye', 's16')} Abstract</button>${open ? `<a class="btn btn-p btn-sm" href="${esc(open)}" target="_blank" rel="noopener noreferrer">${icon(validUrl(r.fileUrl) ? 'download' : 'ext', 's16')} ${validUrl(r.fileUrl) ? 'Unduh PDF' : 'Tautan'}</a>` : ''}<button class="btn btn-o btn-sm" data-cite="${esc(cite)}">${icon('copy', 's16')} Sitasi</button></div></article>`;
 }
 
 /* ---------- Listing generik: filter + grid + pager + SWR ---------- */
@@ -44,9 +44,9 @@ function Listing(host, o) {
   const st = { page: 1, q: '', f: {} };
   let seq = 0;
   const fl = o.filters || [];
-  host.innerHTML = (fl.length ? `<div class="filters" id="lf" style="grid-template-columns:${fl.map(f => f.type === 'search' ? '2fr' : '1fr').join(' ')} auto">` +
+  host.innerHTML = (fl.length ? `<div class="filters" id="lf" style="grid-template-columns:${fl.map(f => f.type === 'search' ? '2fr' : '1fr').join(' ')} auto"><button type="button" class="btn btn-o filt-toggle" id="lft" aria-expanded="false">${icon('filter', 's16')} Filter lanjutan</button>` +
     fl.map(f => f.type === 'search' ? `<div><label class="f" for="lf_${f.name}">${esc(f.label || 'Cari')}</label><div class="inp-ic">${icon('search')}<input class="inp" id="lf_${f.name}" data-n="${f.name}" type="search" placeholder="${esc(f.ph || 'Kata kunci…')}"></div></div>`
-      : `<div><label class="f" for="lf_${f.name}">${esc(f.label)}</label><select class="inp" id="lf_${f.name}" data-n="${f.name}"><option value="">Semua</option>${(f.opts || []).map(x => { const v = Array.isArray(x) ? x[0] : x, l = Array.isArray(x) ? x[1] : x; return `<option value="${esc(v)}">${esc(l)}</option>`; }).join('')}</select></div>`).join('') +
+      : `<div class="f-extra"><label class="f" for="lf_${f.name}">${esc(f.label)}</label><select class="inp" id="lf_${f.name}" data-n="${f.name}"><option value="">Semua</option>${(f.opts || []).map(x => { const v = Array.isArray(x) ? x[0] : x, l = Array.isArray(x) ? x[1] : x; return `<option value="${esc(v)}">${esc(l)}</option>`; }).join('')}</select></div>`).join('') +
     `<button class="btn btn-o" id="lreset" type="button">Reset</button></div>` : '') + '<div id="lr"></div>';
   const R = $('#lr', host);
   async function run() {
@@ -72,6 +72,7 @@ function Listing(host, o) {
     lf.addEventListener('input', debounce(e => { const n = e.target.dataset.n; if (!n) return; if (e.target.type === 'search') { st.q = e.target.value.trim(); st.page = 1; run(); } }, 350));
     lf.addEventListener('change', e => { const n = e.target.dataset.n; if (!n || e.target.type === 'search') return; st.f[n] = e.target.value; st.page = 1; run(); });
     $('#lreset', host).onclick = reset;
+    const ft = $('#lft', host); if (ft) ft.onclick = () => { const o = lf.classList.toggle('open'); ft.setAttribute('aria-expanded', o); };
   }
   bindPager(R, p => { st.page = p; run(); window.scrollTo({ top: Math.max(0, host.getBoundingClientRect().top + scrollY - 140), behavior: 'smooth' }); });
   run();

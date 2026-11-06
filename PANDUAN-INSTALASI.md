@@ -147,6 +147,13 @@ Lalu lintas ±1.000 pengunjung/hari aman: halaman publik dilayani dari cache ser
 | Data baru tidak muncul di publik | Cache publik ± hingga 15 menit di browser pengunjung; muat ulang keras (Ctrl+F5). |
 | Lupa kata sandi darurat | Apps Script → jalankan `resetAksesDarurat` → lihat log. |
 
+## Tampilan ponsel
+- **Navigasi bawah ala aplikasi**: situs publik (Beranda · Riset · Katalog · Berita · Menu) dan CMS (Beranda · Approval/Revisi · **＋ Tambah** · Berkas · Menu).
+- Filter katalog, filter peta, dan panel samping muncul sebagai **lembar dari bawah** (*bottom sheet*); modal juga naik dari bawah.
+- **Tabel otomatis menjadi kartu** di ponsel (label kolom diambil dari judul kolom), katalog spesies tampil 2 kolom, filter lanjutan dapat dilipat.
+- Kolom isian berukuran 16 px (iPhone tidak memperbesar layar saat mengetik), target sentuh ≥ 44 px, dan area aman *notch* diperhatikan.
+- **Pasang di layar utama** (tampil layar penuh seperti aplikasi): Android Chrome → menu ⋮ → *Tambahkan ke layar utama*; iPhone Safari → ikon Bagikan → *Tambah ke Layar Utama*.
+
 ## Kecepatan — cara kerjanya
 - Halaman **tampil seketika** dari kerangka + data tersimpan di browser (stale-while-revalidate); data baru menyusul di latar belakang.
 - Permintaan data beranda dimulai di `<head>`, paralel dengan unduhan skrip. Peta (Leaflet) dan grafik (Chart.js) hanya dimuat saat dibutuhkan.

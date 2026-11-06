@@ -4,6 +4,7 @@ Frontend statis untuk **Ekspedisi Riset Akuatik (ERA)**. HTML + CSS + JavaScript
 
 ```
 index.html            ← harus berada di ROOT repository
+manifest.json         ← agar situs dapat dipasang di layar utama ponsel
 css/style.css         ← sistem desain (token DESIGN.md, mode terang/gelap)
 js/config.js          ← SATU-SATUNYA file yang diedit: URL Web App Google Apps Script
 js/core.js            ← util, API client (cache SWR), sesi, router, toast/modal

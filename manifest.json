@@ -1,0 +1,16 @@
+{
+  "name": "Ekspedisi Riset Akuatik (ERA)",
+  "short_name": "ERA",
+  "description": "Portal riset limnologi: ekspedisi, katalog spesies, peta persebaran, dan konservasi perairan darat.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#0B2D4D",
+  "lang": "id",
+  "icons": [
+    { "src": "https://res.cloudinary.com/qzxx5soz/image/upload/f_png,c_pad,w_192,h_192,b_white/Logo_ERA_crop", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "https://res.cloudinary.com/qzxx5soz/image/upload/f_png,c_pad,w_512,h_512,b_white/Logo_ERA_crop", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
