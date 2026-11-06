@@ -144,8 +144,26 @@ Lalu lintas ±1.000 pengunjung/hari aman: halaman publik dilayani dari cache ser
 | "Email … belum terdaftar" | Tambahkan email itu di **Users** (harus sama dengan akun Google yang dipakai). |
 | Unggah gambar gagal | Format tidak diizinkan / > batas MB; atau kebijakan Workspace melarang berbagi publik (ubah ke berkas internal / kebijakan Drive). |
 | PDF gagal | Buka Apps Script → **Executions** untuk pesan galat; pastikan izin Documents sudah diberikan (jalankan ulang fungsi apa pun dan *Allow*). |
+| Visitors kosong / negara "Tidak diketahui" | Tunggu ±3 menit atau buka ulang halaman Visitors (menulis buffer). Negara tak diketahui terjadi bila semua layanan geolokasi diblokir (pemblokir iklan) dan zona waktu tak dikenali — di Vercel pastikan folder `api/` ikut ter-deploy. |
 | Data baru tidak muncul di publik | Cache publik ± hingga 15 menit di browser pengunjung; muat ulang keras (Ctrl+F5). |
 | Lupa kata sandi darurat | Apps Script → jalankan `resetAksesDarurat` → lihat log. |
+
+## Statistik pengunjung (anonim)
+Buka **CMS → Visitors** (khusus Admin): jumlah pengunjung, tayangan halaman, sesi, pengunjung baru, **asal negara** (dengan bendera & persentase), perangkat, halaman teratas, sumber kunjungan, grafik harian, dan ekspor CSV. Rentang 7 hari / 30 hari / 90 hari / 1 tahun. Ringkasannya juga muncul sebagai kartu di dashboard.
+
+**Cara kerja & privasi**
+- Tanpa cookie. Alamat IP **tidak pernah disimpan**. Browser hanya mengirim: kode negara, jenis perangkat, situs rujukan, jalur halaman, dan penanda "pengunjung baru hari ini". Data disimpan **teragregasi per hari** (bukan satu baris per kunjungan).
+- Negara ditentukan di browser pengunjung dengan urutan: **`/api/geo`** (fungsi Vercel milik Anda sendiri — paling akurat, hanya aktif di Vercel) → `api.country.is` → Cloudflare trace → perkiraan dari zona waktu. Hasilnya di-cache 7 hari di browser.
+- Admin/anggota yang sedang login, bot, dan pengunjung dengan **Do-Not-Track** tidak dihitung. Halaman `/app` dan `/login` tidak dilacak.
+- Dapat dimatikan: **Settings → Notifications & Ops → Hitung statistik pengunjung**. Saat aktif, footer situs memuat catatan "statistik kunjungan anonim (tanpa cookie & IP)".
+- "Pengunjung" = perkiraan satu browser per hari. Pemblokir iklan, VPN, atau mode privat dapat membuat angka sedikit berbeda dari kenyataan.
+
+**Teknis (hemat kuota Google):** kiriman ditampung di cache lalu ditulis ke Sheets tiap ±25 kunjungan / ±3 menit (juga oleh trigger `pasangTriggerPemanasan` dan saat halaman Visitors dibuka). Bila cache terhapus oleh Google, maksimal beberapa menit data terakhir dapat hilang. Tiga sheet baru (`VisitDaily`, `VisitPages`, `VisitRefs`) dibuat otomatis — **tidak perlu menjalankan ulang setup**.
+
+**Cara memperbarui dari versi sebelumnya**
+1. Backend: tempel ulang `Kode.gs`, `Skema.gs`, `Data.gs`, `Layanan.gs` → **Deploy → New version**.
+2. Frontend: ganti isi proyek dengan ZIP baru (termasuk folder `api/`) → `git push`. Vercel otomatis memasang fungsi `/api/geo`.
+3. Uji: buka situs di jendela *incognito* → buka **CMS → Visitors**. Kunjungan Anda sendiri tercatat; negara harus sesuai lokasi Anda. Bila kosong, cek Apps Script → **Executions** untuk fungsi `doPost`.
 
 ## Tampilan ponsel
 - **Navigasi bawah ala aplikasi**: situs publik (Beranda · Riset · Katalog · Berita · Menu) dan CMS (Beranda · Approval/Revisi · **＋ Tambah** · Berkas · Menu).

@@ -30,6 +30,7 @@
   R('/app/users', (p, q, T) => Pages.users(p, q, T), AD);
   R('/app/audit', (p, q, T) => Pages.audit(p, q, T), AD);
   R('/app/settings', (p, q, T) => Pages.settings(p, q, T), AD);
+  R('/app/visitors', (p, q, T) => Pages.visitors(p, q, T), AD);
   Router.notFound = {
     opt: {}, handler: async () => {
       const adm = Auth.on && /^\/app/.test(Router.cur.path), main = adm ? Shell.admin('', 'Tidak ditemukan') : Shell.public('');

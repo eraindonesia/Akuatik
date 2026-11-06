@@ -303,7 +303,7 @@ const Router = {
     if (hit.r.opt.auth && !Auth.on) { Router.go('/login?next=' + encodeURIComponent(cur.path), true); return; }
     if (hit.r.opt.admin && !Auth.isAdmin) { toast('Halaman ini hanya untuk Admin.', 'warn'); Router.go('/app', true); return; }
     window.scrollTo(0, 0); document.title = 'Ekspedisi Riset Akuatik (ERA)';
-    try { await hit.r.handler(hit.p, cur.q, T); }
+    try { await hit.r.handler(hit.p, cur.q, T); if (T.ok() && window.Track) Track.route(cur.path); }
     catch (e) { if (!T.ok()) return; console.error(e); const m = Shell.main(); if (m) m.innerHTML = Views.error(e.message || 'Terjadi kesalahan'); }
   }
 };
