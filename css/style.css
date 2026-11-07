@@ -406,3 +406,17 @@ button,a,.chip,.opt,.qa{touch-action:manipulation}
   .hero-main h1{font-size:27px}
 }
 @media(max-width:768px) and (orientation:landscape){.hero-main{padding:24px 0 70px}.tabbar a span,.tabbar button span{display:none}.tabbar{padding-top:3px;padding-bottom:calc(3px + env(safe-area-inset-bottom))}}
+
+/* ---------- nama situs 3 baris, huruf depan berwarna ---------- */
+.bn{display:flex;flex-direction:column;justify-content:center;min-width:0;text-transform:none}
+.bw{display:block;font:700 12.5px/13.5px var(--f-sans);letter-spacing:.015em;color:var(--nav-ink);white-space:nowrap}
+.bw .in{font-size:16px;font-weight:800;letter-spacing:0;margin-right:.5px}
+.bw0 .in{color:#0E9A93}.bw1 .in{color:#1E5AA8}.bw2 .in{color:#2E8B3E}
+[data-theme=dark] .bw0 .in,.foot .bw0 .in,.login-l .bw0 .in{color:#53dad1}
+[data-theme=dark] .bw1 .in,.foot .bw1 .in,.login-l .bw1 .in{color:#7FB4FF}
+[data-theme=dark] .bw2 .in,.foot .bw2 .in,.login-l .bw2 .in{color:#7FDB8A}
+.foot .bw,.login-l .bw{color:#fff}
+.foot .brand .bw{font-size:14px;line-height:15.5px}.foot .brand .bw .in{font-size:18px}
+.login-l .bw{font-size:14px;line-height:15.5px}.login-l .bw .in{font-size:18px}
+@media(max-width:768px){.bw{font-size:10.5px;line-height:12px}.bw .in{font-size:13.5px}}
+@media(max-width:400px){.bw{font-size:10px;line-height:11.5px}.bw .in{font-size:13px}}

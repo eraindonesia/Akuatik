@@ -31,6 +31,13 @@ function pager(total, page, size) {
     '<button data-p="' + (page + 1) + '" ' + (page >= n ? 'disabled' : '') + ' aria-label="Berikutnya">' + icon('chevR', 's16') + '</button></nav>';
 }
 function waveSvg(cls) { return '<svg class="wave ' + (cls || '') + '" viewBox="0 0 1440 48" preserveAspectRatio="none" aria-hidden="true"><path d="M0 24C120 4 240 4 360 20s240 24 360 8 240-26 360-12 240 22 360 6V48H0z"/></svg>'; }
+/* nama situs: tiap kata satu baris, huruf depan berwarna (biru / tosca / hijau — selaras logo) */
+const BRAND_DEFAULT = 'Ekspedisi Riset Akuatika';
+function brandName() { const n = String(setting('SITE_NAME', BRAND_DEFAULT) || BRAND_DEFAULT).trim(); return n === 'Ekspedisi Riset Akuatik' ? BRAND_DEFAULT : n; }
+function brandHtml() {
+  const w = brandName().split(/\s+/).filter(Boolean);
+  return '<span class="bn"><span class="sr">' + esc(w.join(' ')) + '</span>' + w.map((x, i) => { const a = Array.from(x); return '<span class="bw bw' + (i % 3) + '" aria-hidden="true"><span class="in">' + esc(a[0]) + '</span>' + esc(a.slice(1).join('')) + '</span>'; }).join('') + '</span>';
+}
 const DEFAULT_LOGO = 'https://res.cloudinary.com/qzxx5soz/image/upload/f_auto,q_auto/Logo_ERA_crop';
 function logoUrl() { const u = (ERA.S.boot && ERA.S.boot.settings && ERA.S.boot.settings.LOGO_URL) || ''; return validUrl(u) ? u : DEFAULT_LOGO; }
 ERA.logoErr = function (el) { const p = el.parentNode; if (p) p.classList.remove('logo'); el.outerHTML = icon('wave', 's24'); };
@@ -118,7 +125,7 @@ const Shell = {
       $('#app').innerHTML =
         (ERA.S.boot.demo ? '<div class="demo-bar">Mode <b>data contoh</b> aktif — ganti dengan data asli atau jalankan <code>hapusDataContoh()</code> di Apps Script.</div>' : '') +
         '<div class="topbar"><div class="wrap"><span class="live">PORTAL RISET LIMNOLOGI TERBUKA</span><span>WGS84 · OPEN ACCESS CC-BY-NC 4.0</span></div></div>' +
-        '<header class="nav"><div class="wrap"><a class="brand" href="#/" aria-label="Beranda ERA"><span class="mk logo">' + mark + '</span><span><b>' + esc(setting('SITE_NAME', 'Ekspedisi Riset Akuatik')) + '</b><small>' + esc(setting('SITE_TAGLINE', 'ERA LIMNOLOGY & MARINE PORTAL')) + '</small></span></a>' +
+        '<header class="nav"><div class="wrap"><a class="brand" href="#/" aria-label="Beranda ERA"><span class="mk logo">' + mark + '</span>' + brandHtml() + '</a>' +
         '<ul class="menu" role="menubar">' + m.map(i => '<li data-k="' + i.k + '"><a href="#' + i.path + '/' + (i.subs[0][0]) + '" role="menuitem">' + esc(i.label) + (i.subs.length > 1 ? icon('chevD', 's16') : '') + '</a><div class="mega" role="menu">' + i.subs.map(s => '<a href="#' + i.path + '/' + s[0] + '" role="menuitem">' + icon('chevR', 's16') + esc(s[1]) + '</a>').join('') + '</div></li>').join('') + '</ul>' +
         '<div class="nav-r"><button class="btn btn-o btn-ic" data-act="search" aria-label="Cari">' + icon('search') + '</button><button class="btn btn-o btn-ic" data-theme-ic data-act="theme" aria-label="Ganti tema">' + icon(Theme.get() === 'dark' ? 'sun' : 'moon') + '</button><a class="btn btn-o btn-sm" id="nav-login" href="#/login">' + icon('user', 's16') + '<span>Member Login</span></a><button class="btn btn-o btn-ic burger" data-act="burger" aria-label="Menu">' + icon('menu') + '</button></div></div></header>' +
         '<main id="main" tabindex="-1"></main>' + this.footer() +
@@ -139,8 +146,8 @@ const Shell = {
   updateChrome() {   // data boot asli tiba setelah kerangka tampil: segarkan footer, nama & logo tanpa menggambar ulang halaman
     if (this.type !== 'public') return;
     const f = $('.foot'); if (f) f.outerHTML = this.footer();
-    const b = $('.nav .brand b'), t = $('.nav .brand small'), im = $('.nav .logo-img');
-    if (b) b.textContent = setting('SITE_NAME', 'Ekspedisi Riset Akuatik'); if (t) t.textContent = setting('SITE_TAGLINE', 'ERA LIMNOLOGY & MARINE PORTAL');
+    const b = $('.nav .brand .bn'), im = $('.nav .logo-img');
+    if (b) b.outerHTML = brandHtml();
     if (im && im.getAttribute('src') !== logoUrl()) im.src = logoUrl();
   },
   searchBox() {
@@ -150,7 +157,7 @@ const Shell = {
   },
   footer() {
     const soc = [['SOCIAL_INSTAGRAM', 'IG', 'Instagram'], ['SOCIAL_YOUTUBE', 'YT', 'YouTube'], ['SOCIAL_LINKEDIN', 'in', 'LinkedIn'], ['SOCIAL_GITHUB', 'GH', 'GitHub'], ['SOCIAL_ZENODO', 'Zn', 'Zenodo'], ['SOCIAL_X', 'X', 'X']].filter(s => validUrl(setting(s[0])));
-    return '<footer class="foot"><div class="wrap"><div class="grid"><div><div class="brand" style="color:#fff!important;margin-bottom:12px"><span class="mk logo">' + logoMark() + '</span><b style="font-size:16px">' + esc(setting('SITE_NAME', 'ERA Portal')) + '</b></div><p style="font-size:14px">Pusat pengkajian dan observasi ekosistem perairan darat. Mengembangkan sains konservasi berbasis data terintegrasi.</p></div>' +
+    return '<footer class="foot"><div class="wrap"><div class="grid"><div><div class="brand" style="color:#fff!important;margin-bottom:12px"><span class="mk logo">' + logoMark() + '</span>' + brandHtml() + '</div><p style="font-size:14px">Pusat pengkajian dan observasi ekosistem perairan darat. Mengembangkan sains konservasi berbasis data terintegrasi.</p></div>' +
       '<div><h4>Research Stations</h4><a href="#/contact/info">' + esc(setting('ADDRESS')) + '</a><a href="#/expeditions/locations">Lihat semua lokasi riset →</a></div>' +
       '<div><h4>Portal Directory</h4>' + [['/about/who', 'About'], ['/research/all', 'Research'], ['/expeditions/overview', 'Expeditions'], ['/database/fish', 'Database'], ['/publications/all', 'Publications'], ['/news/all', 'News'], ['/collaboration/overview', 'Collaboration'], ['/knowledge/all', 'Knowledge']].map(x => '<a href="#' + x[0] + '">' + x[1] + '</a>').join('') + '</div>' +
       '<div><h4>Hubungi Kami</h4><a href="mailto:' + esc(setting('EMAIL')) + '">' + esc(setting('EMAIL')) + '</a><a href="tel:' + esc(String(setting('PHONE')).replace(/\s/g, '')) + '">' + esc(setting('PHONE')) + '</a><span style="font-size:13px;color:#8FAAC4">' + esc(setting('OFFICE_HOURS')) + '</span>' + (soc.length ? '<div class="soc" style="margin-top:14px">' + soc.map(s => '<a href="' + esc(s[0] && setting(s[0])) + '" target="_blank" rel="noopener noreferrer" aria-label="' + s[2] + '" class="mono xs">' + s[1] + '</a>').join('') + '</div>' : '') + '</div></div>' +
