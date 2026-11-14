@@ -420,3 +420,8 @@ button,a,.chip,.opt,.qa{touch-action:manipulation}
 .login-l .bw{font-size:14px;line-height:15.5px}.login-l .bw .in{font-size:18px}
 @media(max-width:768px){.bw{font-size:10.5px;line-height:12px}.bw .in{font-size:13.5px}}
 @media(max-width:400px){.bw{font-size:10px;line-height:11.5px}.bw .in{font-size:13px}}
+
+/* ---------- hero dengan foto: foto terlihat jelas, teks di kiri tetap terbaca ---------- */
+.hero.img::before{display:none}
+.hero.img::after{background:linear-gradient(90deg,rgba(0,24,48,.86) 0%,rgba(0,24,48,.62) 42%,rgba(0,24,48,.22) 100%),linear-gradient(0deg,rgba(0,24,48,.55) 0%,transparent 38%)}
+@media(max-width:768px){.hero.img::after{background:linear-gradient(180deg,rgba(0,24,48,.78) 0%,rgba(0,24,48,.6) 55%,rgba(0,24,48,.82) 100%)}}

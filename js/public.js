@@ -84,13 +84,14 @@ Pages.home = function () {
   const B = ERA.S.boot, H = B.home, st = B.stats, org = B.org || {}, ld = !!B.loading;
   const main = Shell.public('home');
   if (B.error) { main.innerHTML = '<div class="wrap sec"><div class="empty">' + icon('alert', 's32') + '<h3>Tidak dapat memuat data portal</h3><p>' + esc(B.error) + '</p><button class="btn btn-p" onclick="ERA.retryBoot()">' + icon('refresh', 's16') + ' Coba lagi</button></div></div>'; return; }
-  const base = u => String(u).split('?')[0].split('/').pop().replace(/\.[a-z0-9]+$/i, '').toLowerCase();
-  const isLogo = u => base(u) === base(logoUrl()) || /logo/.test(base(u));
-  const heroImg = validUrl(setting('HERO_IMAGE')) && !isLogo(setting('HERO_IMAGE')) ? setting('HERO_IMAGE') : '';   // logo bukan foto hero
+  // gambar hero tidak boleh berupa logo: sama persis dengan logo (ID berkas Drive / URL), atau nama berkas berawalan "logo"
+  const sameImg = (a, b) => { const ia = driveId(a), ib = driveId(b); if (ia || ib) return !!ia && ia === ib; const n = u => String(u).split('#')[0].replace(/^https?:\/\//, ''); return n(a) === n(b); };
+  const logoNamed = u => { const f = String(u).split('?')[0].split('/').pop().replace(/\.[a-z0-9]+$/i, '').toLowerCase(); return f !== 'thumbnail' && /^logo|[-_ ]logo([-_ ]|$)/.test(f); };
+  const hi = setting('HERO_IMAGE'), heroImg = validUrl(hi) && !sameImg(hi, logoUrl()) && !logoNamed(hi) ? hi : '';
   const intro = String(org.who || '').split(/\n\s*\n/)[0];
   const locs = H.locations || [];
   main.innerHTML = `
-  <section class="hero ${heroImg ? 'img' : ''}" ${heroImg ? `style="background-image:url('${esc(heroImg)}');background-size:cover;background-position:center"` : ''}>
+  <section class="hero ${heroImg ? 'img' : ''}" ${heroImg ? `style="background-image:url('${esc(heroImg)}');background-size:cover;background-position:center 45%"` : ''}>
     <div class="wrap hero-main"><div class="eyebrow" style="color:#53dad1"><span class="mono">PORTAL RISET LIMNOLOGI // DANAU PURBA SULAWESI</span></div>
       <h1 style="margin-top:14px">${esc(setting('HERO_TITLE', 'Exploring and Protecting Freshwater Life'))}</h1>
       <p class="lead">${esc(setting('HERO_SUBTITLE', 'Lembaga riset independen untuk eksplorasi limnologi, konservasi spesies purba endemik, dan pemetaan keanekaragaman hayati ekosistem perairan darat Indonesia.'))}</p>
